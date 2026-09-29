@@ -129,6 +129,8 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   p{margin:0 0 1em}
   .lead{font-family:var(--serif);font-size:clamp(1.05rem,1.4vw,1.2rem);line-height:1.7;max-width:36em}
   .section-quote{margin:22px 0 0;font-style:italic;letter-spacing:.12em;text-transform:uppercase;font-size:.9rem;color:var(--graphite)}
+  .linklike{padding:0;border:0;background:none;font:inherit;color:var(--leaf);text-decoration:underline;cursor:pointer}
+  .linklike:hover{color:var(--ink)}
   .note{margin-top:16px;font-size:.95rem;color:#555}
 
   /* Two-column layout used by About, Volunteer, Donate */
@@ -283,7 +285,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
       <span class="logo hero-logo" role="img" aria-label="Edible Healing Garden logo"></span>
       <h1 tabindex="-1">Edible Healing Garden</h1>
       <span class="rule"></span>
-      <button type="button" class="btn" data-open-form>Get involved</button>
+      <button type="button" class="btn" data-open-form="https://forms.cloud.microsoft/r/VUJSmhppUA" data-form-title="Volunteer sign-up">Get involved</button>
     </div>
     <p class="motto">“Healing and nourishing the world,<br> one garden at a time”</p>
   </section>
@@ -320,7 +322,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     <div class="cols">
       <div>
         <p class="lead">We welcome gardeners, cooks, students, and anyone who wants to spend a few hours outdoors helping families grow and enjoy fresh food.</p>
-        <button type="button" class="btn solid" data-open-form>Sign up to volunteer</button>
+        <button type="button" class="btn solid" data-open-form="https://forms.cloud.microsoft/r/VUJSmhppUA" data-form-title="Volunteer sign-up">Sign up to volunteer</button>
       </div>
       <div class="aside">
         <h3>Ways to help</h3>
@@ -347,13 +349,13 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
           <li>Provide a safe space for people to grow their own food and establish food sovereignty</li>
           <li>Empower every family and child that struggles with food insecurity</li>
         </ul>
-        <a class="btn solid" href="mailto:hello@ediblehealinggarden.org?subject=Donation%20to%20Edible%20Healing%20Garden">Email us to donate</a>
+        <button type="button" class="btn solid" data-open-form="https://forms.cloud.microsoft/r/MwHXi3FGUn" data-form-title="Donate to the garden">Contact us to donate</button>
         <p class="note">We’ll reply with how to give.</p>
       </div>
       <div class="aside">
         <h3>In-kind donations</h3>
-        <p>Have plants, seeds, compost, mulch, extra fruits or vegetables from your own garden or business, or garden materials, equipment, supplies, or tools? Email us at <a href="mailto:hello@ediblehealinggarden.org?subject=In-kind%20donation">hello@ediblehealinggarden.org</a>.</p>
-        <p>Want to help plan future events and workshops? <a href="mailto:hello@ediblehealinggarden.org?subject=Events%20and%20workshops">Email us!</a></p>
+        <p>Have plants, seeds, compost, mulch, extra fruits or vegetables from your own garden or business, or garden materials, equipment, supplies, or tools? <button type="button" class="linklike" data-open-form="https://forms.cloud.microsoft/r/MwHXi3FGUn" data-form-title="In-kind donation">Let us know</button>.</p>
+        <p>Want to help plan future events and workshops? <button type="button" class="linklike" data-open-form="https://forms.cloud.microsoft/r/MwHXi3FGUn" data-form-title="Help plan events and workshops">Reach out!</button></p>
       </div>
     </div>
 
@@ -415,11 +417,11 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   <div class="fm-panel">
     <div class="fm-head">
       <h3 id="form-title">Volunteer sign-up</h3>
-      <button type="button" class="fm-close" aria-label="Close sign-up form"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button type="button" class="fm-close" aria-label="Close form"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
-    <!-- The form loads the first time someone opens this window -->
-    <iframe title="Volunteer sign-up form" data-src="https://forms.cloud.microsoft/r/VUJSmhppUA?embed=true" allowfullscreen></iframe>
-    <p class="fm-alt">Form not loading? <a href="https://forms.cloud.microsoft/r/VUJSmhppUA" target="_blank" rel="noopener">Open it in a new tab</a>.</p>
+    <!-- Each button's form loads when it's clicked (set with data-open-form and data-form-title on the button) -->
+    <iframe title="Form" allowfullscreen></iframe>
+    <p class="fm-alt">Form not loading? <a href="#" target="_blank" rel="noopener">Open it in a new tab</a>.</p>
   </div>
 </dialog>
 
@@ -449,14 +451,22 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   var LOCK_MS = 900;
 
-  // ---------- Volunteer sign-up pop-up ----------
+  // ---------- Form pop-ups (volunteer sign-up and contact) ----------
   var formModal = document.querySelector('.form-modal');
   var formFrame = formModal.querySelector('iframe');
+  var formTitle = formModal.querySelector('#form-title');
+  var formAlt = formModal.querySelector('.fm-alt a');
   document.querySelectorAll('[data-open-form]').forEach(function(btn){
     btn.addEventListener('click', function(){
-      if (!formFrame.getAttribute('src')) formFrame.setAttribute('src', formFrame.getAttribute('data-src'));
-      if (typeof formModal.showModal === 'function') formModal.showModal();
-      else window.open(formFrame.getAttribute('data-src').replace('?embed=true',''), '_blank');
+      var url = btn.getAttribute('data-open-form');
+      var title = btn.getAttribute('data-form-title') || 'Form';
+      if (typeof formModal.showModal !== 'function') { window.open(url, '_blank'); return; }
+      formTitle.textContent = title;
+      formFrame.title = title + ' form';
+      formAlt.href = url;
+      var embed = url + '?embed=true';
+      if (formFrame.getAttribute('src') !== embed) formFrame.setAttribute('src', embed);
+      formModal.showModal();
     });
   });
   formModal.querySelector('.fm-close').addEventListener('click', function(){ formModal.close(); });
