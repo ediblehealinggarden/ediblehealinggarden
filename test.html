@@ -305,7 +305,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   <!-- ================= HOME ================= -->
   <section class="view home" id="home" data-title="Edible Healing Garden">
     <h1 tabindex="-1">Edible Healing<br>Garden</h1>
-    <a class="btn" href="https://forms.cloud.microsoft/r/VUJSmhppUA" target="_blank" rel="noopener" data-open-form="#volunteer-form">Get involved</a>
+    <a class="btn" href="https://forms.cloud.microsoft/r/VUJSmhppUA" target="_blank" rel="noopener" data-open-form="#volunteer-form" data-form-title="Sign up to volunteer">Get involved</a>
     <div class="hero-row">
       <div class="stat">
         <div class="card"><span class="label">Numbered<br>garden beds</span><span class="num">21</span></div>
@@ -420,7 +420,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
           <p>Park for free in the medical center lot on Zonal Ave. From the lot, follow the path on the map down the side of the building to the garden.</p>
         </div>
         <h3 style="margin-top:24px">When</h3>
-        <p>Weekdays, by appointment. <a href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form">Contact us</a> to plan a visit, or follow <a href="https://www.instagram.com/ediblehealinggarden/" target="_blank" rel="noopener">@EdibleHealingGarden</a> for events and volunteer days.</p>
+        <p>Weekdays, by appointment. <a href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form" data-form-title="Plan a visit">Plan a visit</a> with us, or follow <a href="https://www.instagram.com/ediblehealinggarden/" target="_blank" rel="noopener">@EdibleHealingGarden</a> for events and volunteer days.</p>
         <h3>Who</h3>
         <p>Everyone ages 3 and up (with a guardian): patients and visitors, the medical community, students and interns, and gardening enthusiasts.</p>
       </div>
@@ -438,7 +438,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     <h2 tabindex="-1">Volunteer</h2>
     <p class="lead intro">We welcome gardeners, cooks, students, and anyone who wants to spend a few hours outdoors helping families grow and enjoy fresh food.</p>
     <!-- Opens the volunteer sign-up form in a pop-up (the form link is set on the dialog near the bottom of this file) -->
-    <p class="center"><a class="btn" href="https://forms.cloud.microsoft/r/VUJSmhppUA" target="_blank" rel="noopener" data-open-form="#volunteer-form">Sign up to volunteer</a></p>
+    <p class="center"><a class="btn" href="https://forms.cloud.microsoft/r/VUJSmhppUA" target="_blank" rel="noopener" data-open-form="#volunteer-form" data-form-title="Sign up to volunteer">Sign up to volunteer</a></p>
     <div>
       <h3 class="helps-title">Ways to help</h3>
       <ul class="helps">
@@ -463,15 +463,15 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
           <li>Empower every family and child that struggles with food insecurity</li>
         </ul>
         <div class="give">
-          <a class="btn" href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form">Contact us to donate</a>
+          <a class="btn" href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form" data-form-title="Donate to the garden">Make a donation</a>
           <p class="note">We’ll reply with how to give.</p>
         </div>
       </div>
       <div class="kind">
         <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18h28v16H6ZM4 12h32v6H4ZM20 12v22M20 12c-4 0-8-2-7-6 1-3 5-1 7 6 2-7 6-9 7-6 1 4-3 6-7 6Z"/></svg>
         <h3>In-kind donations</h3>
-        <p>Have plants, seeds, compost, mulch, extra fruits or vegetables from your own garden or business, or garden materials, equipment, supplies, or tools? <a href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form">Contact us</a> and tell us what you have.</p>
-        <p>Want to help plan future events and workshops? <a href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form">Contact us!</a></p>
+        <p>Have plants, seeds, compost, mulch, extra fruits or vegetables from your own garden or business, or garden materials, equipment, supplies, or tools? <a href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form" data-form-title="Offer an in-kind donation">Tell us what you’d like to donate</a>.</p>
+        <p>Want to help plan future events and workshops? <a href="https://forms.cloud.microsoft/r/MwHXi3FGUn" target="_blank" rel="noopener" data-open-form="#contact-form" data-form-title="Help plan events and workshops">Let us know you’re interested!</a></p>
       </div>
     </div>
 
@@ -529,7 +529,8 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   </main>
 </div>
 
-<!-- Pop-up forms (Microsoft Forms). Buttons open them with data-open-form="#id".
+<!-- Pop-up forms (Microsoft Forms). Buttons open them with data-open-form="#id";
+     each button's data-form-title sets the heading shown at the top of the pop-up.
      To swap a form, change its data-src (and the matching link on the buttons, used if pop-ups aren't supported). -->
 <dialog class="form-modal" id="volunteer-form" aria-labelledby="vf-title">
   <div class="fm-head">
@@ -598,6 +599,8 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
       e.preventDefault();
       var frame = modal.querySelector('iframe');
       if (!frame.src) frame.src = frame.getAttribute('data-src');   // load each form only when it's first opened
+      var title = btn.getAttribute('data-form-title');
+      if (title) modal.querySelector('.fm-head h2').textContent = title;   // heading matches the button that opened it
       modal.showModal();
     });
   });
