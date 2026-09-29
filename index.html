@@ -27,6 +27,10 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     --side:210px;                                   /* left nav column */
     --rail:clamp(96px,10vw,150px);                  /* right icon column */
     --fade:450ms;
+    /* Home background photo: swap the file, and adjust the overlay (0 = no tint, 1 = solid) to taste */
+    --hero-image:url("images/hero.webp");
+    --hero-overlay:.84;
+    --hero-position:50% 62%;   /* which part of the photo stays in view when it's cropped (left-right, top-bottom) */
   }
   *,*::before,*::after{box-sizing:border-box}
   html{scroll-behavior:smooth}
@@ -109,6 +113,9 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   .pill.solid:hover{background:var(--green-deep);border-color:var(--green-deep)}
 
   /* ============ Home ============ */
+  .home{position:relative;isolation:isolate}
+  .home::before{content:"";position:absolute;inset:0;z-index:-1;
+    background:linear-gradient(rgba(242,243,240,var(--hero-overlay)),rgba(242,243,240,var(--hero-overlay))),var(--hero-image) var(--hero-position) / cover no-repeat}
   .home > *{width:auto;max-width:none}
   .home .btn{margin-top:28px}
   .hero-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-end;gap:32px 40px;margin-top:30px}
@@ -771,4 +778,3 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
 </script>
 </body>
 </html>
-
