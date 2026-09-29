@@ -71,8 +71,9 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   .js .view.is-in > .motto{animation-delay:.5s}
 
   /* One-page-at-a-time mode (large screens): sections stack in place and crossfade */
-  body.panels{height:100vh;height:100dvh;overflow:hidden}
-  body.panels .frame{height:100vh;height:100dvh;overflow:hidden}
+  html:has(body.panels){overflow:hidden;overscroll-behavior:none}
+  body.panels{position:fixed;inset:0;height:auto;overflow:hidden;overscroll-behavior:none}
+  body.panels .frame{height:100%;overflow:hidden}
   body.panels main{position:absolute;inset:0}
   body.panels .view{position:absolute;inset:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;
     opacity:0;visibility:hidden;transition:opacity var(--fade) ease,visibility 0s linear var(--fade)}
@@ -174,6 +175,19 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   .gallery figcaption{position:absolute;left:0;bottom:0;padding:8px 14px;background:var(--paper);font-size:.78rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink);pointer-events:none}
   .gallery-more{margin:24px 0 0;color:#555;font-size:.95rem}
 
+  /* Volunteer sign-up pop-up */
+  .form-modal{border:0;padding:0;background:transparent;width:min(680px,94vw);max-width:none;max-height:none;overflow:visible}
+  .form-modal::backdrop{background:rgba(20,24,12,.72)}
+  .form-modal[open]{animation:lbIn .3s ease}
+  .fm-panel{background:var(--paper);box-shadow:0 30px 60px -20px rgba(0,0,0,.5);display:flex;flex-direction:column;max-height:92vh;max-height:92dvh}
+  .fm-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 16px 14px 24px;border-bottom:4px solid var(--black)}
+  .fm-head h3{margin:0;font-size:1.1rem}
+  .fm-close{width:40px;height:40px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;display:grid;place-items:center;flex:none}
+  .fm-close:hover{background:var(--black);color:#fff}
+  .fm-close svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+  .form-modal iframe{display:block;width:100%;height:min(640px,72vh);height:min(640px,72dvh);border:0;background:var(--mist)}
+  .fm-alt{margin:0;padding:10px 24px 14px;font-size:.85rem;color:#555;border-top:1px solid #ddd}
+
   /* Photo viewer */
   .lightbox{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;border:0;padding:24px;background:rgba(20,24,12,.9)}
   .lightbox[open]{display:grid;place-items:center}
@@ -222,7 +236,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     html{scroll-behavior:auto}
     .js .view > *,.js .view.is-in > *{opacity:1;animation:none}
     .gallery img{transition:none}
-    .lightbox[open]{animation:none}
+    .lightbox[open],.form-modal[open]{animation:none}
     .sidebar{animation:none}
   }
 </style>
@@ -269,7 +283,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
       <span class="logo hero-logo" role="img" aria-label="Edible Healing Garden logo"></span>
       <h1 tabindex="-1">Edible Healing Garden</h1>
       <span class="rule"></span>
-      <a class="btn" href="#volunteer">Get involved</a>
+      <button type="button" class="btn" data-open-form>Get involved</button>
     </div>
     <p class="motto">“Healing and nourishing the world,<br> one garden at a time”</p>
   </section>
@@ -306,8 +320,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     <div class="cols">
       <div>
         <p class="lead">We welcome gardeners, cooks, students, and anyone who wants to spend a few hours outdoors helping families grow and enjoy fresh food.</p>
-        <!-- Swap this link for a Google Form if you have one -->
-        <a class="btn solid" href="mailto:hello@ediblehealinggarden.org?subject=Volunteering%20at%20Edible%20Healing%20Garden">Sign up to volunteer</a>
+        <button type="button" class="btn solid" data-open-form>Sign up to volunteer</button>
       </div>
       <div class="aside">
         <h3>Ways to help</h3>
@@ -398,6 +411,18 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   </main>
 </div>
 
+<dialog class="form-modal" aria-labelledby="form-title">
+  <div class="fm-panel">
+    <div class="fm-head">
+      <h3 id="form-title">Volunteer sign-up</h3>
+      <button type="button" class="fm-close" aria-label="Close sign-up form"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <!-- The form loads the first time someone opens this window -->
+    <iframe title="Volunteer sign-up form" data-src="https://forms.cloud.microsoft/r/VUJSmhppUA?embed=true" allowfullscreen></iframe>
+    <p class="fm-alt">Form not loading? <a href="https://forms.cloud.microsoft/r/VUJSmhppUA" target="_blank" rel="noopener">Open it in a new tab</a>.</p>
+  </div>
+</dialog>
+
 <dialog class="lightbox" aria-label="Photo viewer">
   <button type="button" class="lb-close" aria-label="Close photo"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   <div class="lb-inner">
@@ -423,6 +448,20 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   var bigScreen = window.matchMedia('(min-width: 1024px) and (min-height: 680px)');
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   var LOCK_MS = 900;
+
+  // ---------- Volunteer sign-up pop-up ----------
+  var formModal = document.querySelector('.form-modal');
+  var formFrame = formModal.querySelector('iframe');
+  document.querySelectorAll('[data-open-form]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      if (!formFrame.getAttribute('src')) formFrame.setAttribute('src', formFrame.getAttribute('data-src'));
+      if (typeof formModal.showModal === 'function') formModal.showModal();
+      else window.open(formFrame.getAttribute('data-src').replace('?embed=true',''), '_blank');
+    });
+  });
+  formModal.querySelector('.fm-close').addEventListener('click', function(){ formModal.close(); });
+  formModal.addEventListener('click', function(e){ if (e.target === formModal) formModal.close(); });
+  function modalOpen(){ return lightbox.open || formModal.open; }
 
   // ---------- Photo viewer ----------
   var lightbox = document.querySelector('.lightbox');
@@ -509,7 +548,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   }
 
   frame.addEventListener('wheel', function(e){
-    if (!body.classList.contains('panels') || lightbox.open) return;
+    if (!body.classList.contains('panels') || modalOpen()) return;
     if (Math.abs(e.deltaY) < 12) return;
     if (locked) { e.preventDefault(); return; }   // ignore leftover trackpad momentum right after a page turn
     var dir = e.deltaY > 0 ? 1 : -1;
@@ -518,20 +557,35 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     step(dir);
   }, { passive: false });
 
-  var touchY = null;
-  frame.addEventListener('touchstart', function(e){ touchY = e.touches[0] ? e.touches[0].clientY : null; }, { passive: true });
+  // ---------- Touch (iPad and touchscreen laptops) ----------
+  // At the start of each swipe we note whether the section can still scroll up or down.
+  // A swipe scrolls inside a tall section; only a fresh swipe that starts at its top or
+  // bottom edge turns the page, so reaching the end of a section never skips ahead by accident.
+  var touchY = null, canDown = false, canUp = false;
+  frame.addEventListener('touchstart', function(e){
+    if (!body.classList.contains('panels') || e.touches.length !== 1) { touchY = null; return; }
+    touchY = e.touches[0].clientY;
+    canDown = canScrollInside(1);
+    canUp = canScrollInside(-1);
+  }, { passive: true });
+  frame.addEventListener('touchmove', function(e){
+    if (!body.classList.contains('panels') || touchY === null || modalOpen()) return;
+    var dir = touchY - e.touches[0].clientY > 0 ? 1 : -1;
+    // Nothing left to scroll that way: stop Safari from dragging the whole page instead
+    if ((dir > 0 && !canDown) || (dir < 0 && !canUp)) e.preventDefault();
+  }, { passive: false });
   frame.addEventListener('touchend', function(e){
-    if (!body.classList.contains('panels') || touchY === null) return;
+    if (!body.classList.contains('panels') || touchY === null || modalOpen()) return;
     var d = touchY - e.changedTouches[0].clientY; touchY = null;
-    if (Math.abs(d) < 50) return;
+    if (Math.abs(d) < 40) return;
     var dir = d > 0 ? 1 : -1;
-    if (canScrollInside(dir)) return;
+    if ((dir > 0 && canDown) || (dir < 0 && canUp)) return;   // that swipe was scrolling inside the section
     step(dir);
   }, { passive: true });
 
   document.addEventListener('keydown', function(e){
     if (!body.classList.contains('panels')) return;
-    if (lightbox.open) return;
+    if (modalOpen()) return;
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
     var k = e.key;
