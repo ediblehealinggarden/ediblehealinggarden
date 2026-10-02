@@ -13,16 +13,18 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
 <link rel="icon" type="image/png" href="images/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sorts+Mill+Goudy&family=Outfit:wght@600;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,500&display=swap" rel="stylesheet">
 <style>
   /* ============ Tokens (edit colors here) ============ */
   :root{
-    --green:#0F5C45; --green-deep:#0A4332;          /* headings, buttons, active nav */
-    --card-light:#9ADB8F; --card:#33C98C;           /* the two card greens */
-    --card-ink:#0B3D2E;                             /* text on green cards */
-    --ground:#F2F3F0; --mint:#DDEFD9; --line:#D5DDD2; --white:#FFFFFF;
-    --text:#1E2E27; --muted:#3A4A43;
+    --green:#586335; --green-deep:#434C27;          /* logo olive */
+    --terracotta:#C76942;                           /* logo "HEALING" orange */          /* headings, buttons, active nav */
+    --card-light:#C8D2A2; --card:#A3B374;           /* the two card greens */
+    --card-ink:#2F3519;                             /* text on green cards */
+    --ground:#F2F3F0; --mint:#E6EAD6; --line:#D9DCCC; --white:#FFFFFF;
+    --text:#26291E; --muted:#4A4D3E;
     --display:"Outfit","DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --serif:"Sorts Mill Goudy","Goudy Old Style",Georgia,"Times New Roman",serif;   /* matches the logo lettering */
     --sans:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
     --side:210px;                                   /* left nav column */
     --rail:clamp(96px,10vw,150px);                  /* right icon column */
@@ -47,7 +49,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   /* ============ Left column: logo and nav ============ */
   .side{position:fixed;left:0;top:0;bottom:0;width:var(--side);z-index:10;display:flex;flex-direction:column;gap:36px;padding-top:28px}
   .logo{display:block;background:url("images/logo.webp") center/contain no-repeat}
-  .side .logo{width:120px;height:108px;margin-left:28px}
+  .side .logo{width:120px;height:116px;margin-left:28px}
   .nav ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
   .nav a{display:block;padding:15px 32px;font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;color:var(--green)}
   .nav a:hover{background:var(--mint);color:var(--green)}
@@ -97,11 +99,12 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
 
   /* ============ Type ============ */
   h1,h2{font-family:var(--display);font-weight:700;color:var(--green);text-align:center;margin:0;letter-spacing:-.01em}
-  h1{font-size:clamp(2.5rem,6.2vw,5rem);line-height:1.02}
+  h1{font-family:var(--serif);font-weight:400;text-transform:uppercase;letter-spacing:.06em;font-size:clamp(2.1rem,5.4vw,4.6rem);line-height:1.08}
+  h1 .accent{color:var(--terracotta)}
   h2{font-size:clamp(2.4rem,4.6vw,3.75rem);line-height:1.05}
-  h3{font-family:var(--display);font-weight:600;font-size:1.3rem;line-height:1.3;color:var(--ink,#0E3B2C);margin:0 0 8px}
+  h3{font-family:var(--display);font-weight:600;font-size:1.3rem;line-height:1.3;color:var(--ink,#2F3519);margin:0 0 8px}
   .sub{margin:14px 0 0;font-size:clamp(1rem,1.5vw,1.15rem);text-align:center;color:var(--text)}
-  .lead{font-size:clamp(1.05rem,1.5vw,1.2rem);line-height:1.65;color:#16261F}
+  .lead{font-size:clamp(1.05rem,1.5vw,1.2rem);line-height:1.65;color:#23261C}
   .note{margin:0;font-size:.95rem;color:var(--muted)}
 
   /* ============ Buttons ============ */
@@ -148,7 +151,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   .offer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:40px}
   .offer > div{background:var(--white);border-radius:10px;padding:24px}
   .offer .bubble{width:48px;height:48px;margin-bottom:14px}
-  .offer p{margin:0;font-size:.95rem;line-height:1.55;color:#2A3A33}
+  .offer p{margin:0;font-size:.95rem;line-height:1.55;color:#3A3D30}
 
   /* ============ Visit ============ */
   .visit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.86fr) minmax(0,.75fr);gap:24px;align-items:start;margin-top:36px}
@@ -176,19 +179,19 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
 
   /* ============ Donate ============ */
   .support{list-style:none;margin:0 0 24px;padding:0}
-  .support li{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);line-height:1.5;color:#16261F}
+  .support li{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line);line-height:1.5;color:#23261C}
   .support li:last-child{border-bottom:0}
-  .support li::before{content:"";flex:none;width:22px;height:22px;margin-top:1px;border-radius:50%;background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M6.5 11.5l3 3 6-6.5' fill='none' stroke='%230B3D2E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/22px no-repeat}
+  .support li::before{content:"";flex:none;width:22px;height:22px;margin-top:1px;border-radius:50%;background:var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M6.5 11.5l3 3 6-6.5' fill='none' stroke='%232F3519' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/22px no-repeat}
   .give{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px}
   .kind{background:var(--card-light);border-radius:10px;padding:28px 26px;color:var(--card-ink)}
   .kind svg{width:40px;height:40px;margin-bottom:14px}
   .kind h3{color:var(--card-ink)}
   .kind p{font-size:.95rem;line-height:1.6;margin:0}
-  .kind p + p{margin-top:14px;padding-top:14px;border-top:1px solid rgba(11,61,46,.25)}
+  .kind p + p{margin-top:14px;padding-top:14px;border-top:1px solid rgba(47,53,25,.25)}
   .kind a{color:var(--card-ink);font-weight:700}
   .donors{margin-top:56px;background:var(--mint);border-radius:12px;padding:28px 24px 24px;text-align:center}
   .donors h3{font-size:1.75rem;font-weight:700;color:var(--green);margin:0}
-  .donors > p{margin:6px 0 0;color:#2A3A33}
+  .donors > p{margin:6px 0 0;color:#3A3D30}
   .logos{list-style:none;margin:20px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
   .logos li{background:var(--white);border-radius:8px;height:112px;display:grid;place-items:center;padding:18px}
   .logos img{max-height:80px;max-width:88%;width:auto;height:auto;object-fit:contain}
@@ -203,11 +206,11 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   .gallery img{width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
   .gallery .photo:hover img{transform:scale(1.04)}
   .gallery figcaption{position:absolute;left:12px;bottom:12px;padding:7px 14px;border-radius:999px;background:var(--green);color:var(--white);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;pointer-events:none}
-  .gallery-more{margin:24px 0 0;text-align:center;color:#2A3A33}
+  .gallery-more{margin:24px 0 0;text-align:center;color:#3A3D30}
   .gallery-more a{font-weight:700}
 
   /* ============ Photo viewer ============ */
-  .lightbox{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;border:0;padding:24px;background:rgba(8,36,27,.92)}
+  .lightbox{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;border:0;padding:24px;background:rgba(38,42,22,.92)}
   .lightbox[open]{display:grid;place-items:center;animation:lbIn .3s ease}
   .lightbox::backdrop{background:transparent}
   .lb-inner{max-width:min(92vw,900px)}
@@ -220,7 +223,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   /* ============ Volunteer form pop-up ============ */
   .form-modal{width:min(680px,calc(100vw - 32px));height:min(780px,calc(100dvh - 48px));max-width:none;max-height:none;margin:auto;padding:0;border:0;border-radius:12px;background:var(--white);overflow:hidden}
   .form-modal[open]{display:flex;flex-direction:column;animation:lbIn .3s ease}
-  .form-modal::backdrop{background:rgba(8,36,27,.72)}
+  .form-modal::backdrop{background:rgba(38,42,22,.72)}
   .fm-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 10px 10px 24px;background:var(--green);color:var(--white)}
   .fm-head h2{font-size:1.25rem;text-align:left;color:var(--white)}
   .fm-close{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:var(--white);cursor:pointer;display:grid;place-items:center}
@@ -252,6 +255,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     .rail{display:none}
     .view{min-height:0;padding:48px 20px 64px}
     .home{padding-top:40px}
+    h1{font-size:8.4vw;letter-spacing:.04em}
     .hero-row{flex-direction:column;align-items:center}
     .hero-center{order:3}
     .stat,.stats .stat{width:342px}
@@ -311,7 +315,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   <main>
   <!-- ================= HOME ================= -->
   <section class="view home" id="home" data-title="Edible Healing Garden">
-    <h1 tabindex="-1">Edible Healing<br>Garden</h1>
+    <h1 tabindex="-1">Edible <span class="accent">Healing</span><br>Garden</h1>
     <a class="btn" href="https://forms.cloud.microsoft/r/VUJSmhppUA" target="_blank" rel="noopener" data-open-form="#volunteer-form" data-form-title="Sign up to volunteer">Get involved</a>
     <div class="hero-row">
       <div class="stat">
@@ -333,7 +337,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
         </svg>
       </div>
       <div class="hero-center">
-        <svg viewBox="0 0 64 52" fill="none" stroke="#0E3B2C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 48h56M14 48V36M14 40c-4-1-6-4-6-7 4 0 6 3 6 7ZM14 38c4-1 6-4 6-7-4 0-6 3-6 7ZM32 48V26M32 32c-5-1-7-5-7-9 5 0 7 4 7 9ZM32 30c5-1 7-5 7-9-5 0-7 4-7 9ZM50 48V14M50 22c-5-1-8-6-8-11 5 0 8 5 8 11ZM50 20c5-1 8-6 8-11-5 0-8 5-8 11ZM14 26v-8m-3 3 3-3 3 3M32 14V6m-3 3 3-3 3 3M50 5V1"/></svg>
+        <svg viewBox="0 0 64 52" fill="none" stroke="#2F3519" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 48h56M14 48V36M14 40c-4-1-6-4-6-7 4 0 6 3 6 7ZM14 38c4-1 6-4 6-7-4 0-6 3-6 7ZM32 48V26M32 32c-5-1-7-5-7-9 5 0 7 4 7 9ZM32 30c5-1 7-5 7-9-5 0-7 4-7 9ZM50 48V14M50 22c-5-1-8-6-8-11 5 0 8 5 8 11ZM50 20c5-1 8-6 8-11-5 0-8 5-8 11ZM14 26v-8m-3 3 3-3 3 3M32 14V6m-3 3 3-3 3 3M50 5V1"/></svg>
         <p class="where">A hospital-based community garden at LA General<br>2020 Zonal Ave, Los Angeles<br><a href="#visit">Free parking and directions</a></p>
       </div>
       <div class="stat taro">
