@@ -244,6 +244,9 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   .fm-close:hover{background:rgba(255,255,255,.26)}
   .fm-close svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
   .form-modal iframe{flex:1;width:100%;border:0;background:var(--ground)}
+  .fm-foot{flex:none;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 20px;border-top:1px solid var(--line);font-size:.95rem}
+  .fm-foot p{margin:0}
+  .fm-foot .btn{padding:11px 20px}
   @media (max-width:600px){.form-modal{width:100vw;height:100dvh;border-radius:0}}
 
   /* ============ Footer (scrolling mode) ============ */
@@ -320,7 +323,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   </header>
 
   <div class="rail">
-    <a class="pin" href="https://www.google.com/maps/search/?api=1&amp;query=2020+Zonal+Ave+Los+Angeles+CA+90033" aria-label="Map to the garden" target="_blank" rel="noopener"><svg viewBox="0 0 24 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 24S4 15.5 4 10a8 8 0 0 1 16 0c0 5.5-8 14-8 14Z"/><circle cx="12" cy="10" r="3"/></svg></a>
+    <a class="pin" href="https://www.google.com/maps/search/?api=1&amp;query=2020+Zonal+Ave+Los+Angeles+CA+90033" aria-label="Map to the garden" target="_blank" rel="noopener" data-open-form="#map-dialog" data-form-title="Find the garden"><svg viewBox="0 0 24 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 24S4 15.5 4 10a8 8 0 0 1 16 0c0 5.5-8 14-8 14Z"/><circle cx="12" cy="10" r="3"/></svg></a>
 
     <!-- Progress dots and arrows; the dots are added by the script below -->
     <div class="pager">
@@ -395,7 +398,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
         <p>This garden intends to be a healing environment that also addresses nutrition insecurity in the population at the Los Angeles General Hospital (LAGH) by empowering families with nutrition knowledge, food sovereignty, and access to nature.</p>
         <div class="location">
           <span class="bubble"><svg viewBox="0 0 24 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 24S4 15.5 4 10a8 8 0 0 1 16 0c0 5.5-8 14-8 14Z"/><circle cx="12" cy="10" r="3"/></svg></span>
-          <p><span class="k">Our location</span><a href="https://www.google.com/maps/search/?api=1&amp;query=2020+Zonal+Ave+Los+Angeles+CA+90033">2020 Zonal Ave, Los Angeles, CA 90033</a></p>
+          <p><span class="k">Our location</span><a href="https://www.google.com/maps/search/?api=1&amp;query=2020+Zonal+Ave+Los+Angeles+CA+90033" target="_blank" rel="noopener" data-open-form="#map-dialog" data-form-title="Find the garden">2020 Zonal Ave, Los Angeles, CA 90033</a></p>
           <span class="loc-veg" aria-hidden="true"><img src="images/veggies/onion.webp" alt="" aria-hidden="true" width="250" height="360" loading="lazy"><img src="images/veggies/potato.webp" alt="" aria-hidden="true" width="305" height="360" loading="lazy"></span>
         </div>
       </div>
@@ -584,6 +587,19 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     <button type="button" class="fm-close" aria-label="Close the contact form"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <iframe title="Contact form" data-src="https://forms.cloud.microsoft/r/MwHXi3FGUn?embed=true" allowfullscreen></iframe>
+</dialog>
+
+<!-- Map pop-up. The map shows inside the page; "Get directions" opens Google Maps (or the phone's maps app) for turn-by-turn. -->
+<dialog class="form-modal" id="map-dialog" aria-labelledby="mf-title">
+  <div class="fm-head">
+    <h2 id="mf-title">Find the garden</h2>
+    <button type="button" class="fm-close" aria-label="Close the map"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <iframe title="Map of LA General Medical Center, 2020 Zonal Ave" data-src="https://www.google.com/maps?q=2020+Zonal+Ave,+Los+Angeles,+CA+90033&amp;z=17&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+  <div class="fm-foot">
+    <p>2020 Zonal Ave, Los Angeles, CA 90033. Free parking in the Zonal Ave lot.</p>
+    <a class="btn" href="https://www.google.com/maps/dir/?api=1&amp;destination=2020+Zonal+Ave+Los+Angeles+CA+90033" target="_blank" rel="noopener">Get directions</a>
+  </div>
 </dialog>
 
 <dialog class="lightbox" aria-label="Photo viewer">
