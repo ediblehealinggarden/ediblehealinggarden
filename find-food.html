@@ -33,7 +33,14 @@ a{color:var(--olive)} a:hover{color:var(--clay)}
 .wrap{display:grid;grid-template-columns:minmax(320px,440px) minmax(0,1fr);margin-left:var(--side)}
 .story{padding-left:max(28px,env(safe-area-inset-left,0px));padding-right:max(28px,env(safe-area-inset-right,0px));padding-block:20px 40vh;border-right:1px solid var(--line);min-width:0}
 .mapcol{position:sticky;top:0;height:100vh;height:100dvh;min-width:0;background:var(--water)}
-svg#map{width:100%;height:100%;display:block;touch-action:manipulation}
+svg#map{width:100%;height:100%;display:block;touch-action:manipulation;cursor:grab}
+svg#map.grabbing{cursor:grabbing}
+.zoom{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:14px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.zoom button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--olive);cursor:pointer;box-shadow:0 2px 8px rgb(0 0 0 / .14);display:grid;place-items:center;padding:0}
+.zoom button:hover{color:var(--clay)}
+.zoom svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.zhint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgb(38 41 30 / .84);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;pointer-events:none;transition:opacity .3s;max-width:calc(100% - 32px);text-align:center;z-index:2}
+.zhint.off{opacity:0}
 .lang{display:flex;gap:6px}
 .chip{font:500 13px var(--body);border:1.5px solid var(--olive);background:transparent;color:var(--olive);border-radius:999px;padding:5px 12px;cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--olive);color:var(--bg)}
@@ -124,7 +131,8 @@ body.leaving{animation:pageOut .4s ease forwards}
 .homelbl{fill:var(--clay);font-family:var(--display);font-weight:700;paint-order:stroke;stroke:var(--halo);stroke-linejoin:round;pointer-events:none}
 .mapnote{position:absolute;right:calc(12px + env(safe-area-inset-right,0px));bottom:10px;font-size:11px;color:var(--muted);background:var(--bg);padding:3px 8px;border-radius:999px;opacity:.9}
 .where{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));top:14px;font:700 19px/1.15 var(--display);color:var(--olive);background:var(--bg);padding:6px 14px;border-radius:999px;box-shadow:0 2px 10px rgb(0 0 0 / .12);max-width:calc(100% - 28px)}
-/* detail */
+/* detail: while a place is open, lift the map column (and its phone pop-up) above the sticky search bar and site menu */
+.mapcol.sheet-open{z-index:40}
 #detail{position:absolute;top:66px;right:calc(16px + env(safe-area-inset-right,0px));bottom:16px;width:min(400px,calc(100% - 32px));overflow:auto;background:var(--panel);color:var(--ink);border-radius:20px;box-shadow:0 10px 34px rgb(0 0 0 / .25);padding:20px 22px;z-index:3;overscroll-behavior:contain}
 #detail h3{font:700 26px/1.1 var(--display);color:var(--olive);margin:6px 0 4px;text-wrap:balance}
 #detail .x{float:right;margin-left:10px}
@@ -187,6 +195,12 @@ body.leaving{animation:pageOut .4s ease forwards}
     <svg id="map" role="img" aria-label="Map of Los Angeles County food resources"></svg>
     <div class="where" id="where" aria-live="polite"></div>
     <div class="mapnote" id="mapnote"></div>
+    <div class="zoom" role="group" id="zoombox">
+      <button type="button" id="zin"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button type="button" id="zout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button type="button" id="zreset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/></svg></button>
+    </div>
+    <div class="zhint off" id="zhint" aria-hidden="true"></div>
     <section id="detail" hidden role="dialog" aria-modal="false" aria-labelledby="dname"></section>
   </div>
 </div>
@@ -213,7 +227,7 @@ const T = {
   sCounty:n=>`Plus ${n} programs that serve the whole county.`, sSee:'See them', sAlso:'Did you mean',
   tips:['Call ahead. Hours change, especially around holidays.','Bring your own bags.','Some places ask for ID or proof of address. Many do not. Each listing says which.'],
   home:'Edible Healing Garden', stop:(i,n)=>`Stop ${i} of ${n}`, places:n=>n===1?'1 place':`${n} places`,
-  overview:'Los Angeles County', note:'Pins are approximate',
+  overview:'Los Angeles County', note:'Pins are approximate', zin:'Zoom in', zout:'Zoom out', zreset:'Reset map view', zhintMac:'Hold \u2318 and scroll to zoom the map', zhint:'Hold Ctrl and scroll to zoom the map',
   cats:{pantry:'Food pantry & meals',bank:'Food bank',market:'Farmers market',garden:'Community garden',fridge:'Community fridge',other:'Youth program'},
   plural:{pantry:'Pantries & meals',bank:'Food banks',market:'Farmers markets',garden:'Gardens',fridge:'Fridges',other:'Youth programs'},
   f:{days:'Days',hours:'Hours',cost:'Cost',signup:'How to sign up',restrict:'What to bring / who can go',waitlist:'Waitlist',lang:'Language',snap:'SNAP / EBT',bus:'Bus & Metro',other:'Good to know',phone:'Phone',email:'Email',social:'Social media'},
@@ -245,7 +259,7 @@ const T = {
   sCounty:n=>`Además, ${n} programas atienden a todo el condado.`, sSee:'Verlos', sAlso:'Quizás quiso decir',
   tips:['Llame antes de ir. Los horarios cambian, sobre todo en días festivos.','Traiga sus propias bolsas.','Algunos lugares piden identificación o comprobante de domicilio. Muchos no. Cada lugar lo indica.'],
   home:'Edible Healing Garden', stop:(i,n)=>`Parada ${i} de ${n}`, places:n=>n===1?'1 lugar':`${n} lugares`,
-  overview:'Condado de Los Ángeles', note:'Ubicaciones aproximadas',
+  overview:'Condado de Los Ángeles', note:'Ubicaciones aproximadas', zin:'Acercar', zout:'Alejar', zreset:'Restablecer la vista', zhintMac:'Mantenga \u2318 y desplace para acercar el mapa', zhint:'Mantenga Ctrl y desplace para acercar el mapa',
   cats:{pantry:'Despensa y comidas',bank:'Banco de alimentos',market:'Mercado de agricultores',garden:'Huerto comunitario',fridge:'Refrigerador comunitario',other:'Programa juvenil'},
   plural:{pantry:'Despensas y comidas',bank:'Bancos de alimentos',market:'Mercados',garden:'Huertos',fridge:'Refrigeradores',other:'Programas juveniles'},
   f:{days:'Días',hours:'Horario',cost:'Costo',signup:'Cómo inscribirse',restrict:'Qué traer / quién puede ir',waitlist:'Lista de espera',lang:'Idioma',snap:'SNAP / EBT',bus:'Autobús y Metro',other:'Bueno saber',phone:'Teléfono',email:'Correo',social:'Redes sociales'},
@@ -335,6 +349,8 @@ function renderStory(){
   $('slabel').textContent = L.sLabel; $('sq').placeholder = L.sPh; $('sgo').textContent = L.sGo;
   if (S) renderResults();
   $('map').setAttribute('aria-label', L.map); $('mapnote').textContent = L.note;
+  ['zin','zout','zreset'].forEach(id => { $(id).setAttribute('aria-label', L[id]); $(id).title = L[id]; });
+  $('zoombox').setAttribute('aria-label', L.zin + ' / ' + L.zout);
   observe(); setWhere();
 }
 function row(e, extra){
@@ -438,7 +454,39 @@ function observe(){
   io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) activate(e.target.dataset.k); }), {rootMargin:`-${top}% 0px -${99-top}% 0px`});
   document.querySelectorAll('.chapter').forEach(s => io.observe(s));
 }
-svg.addEventListener('click', ev => { const c = ev.target.closest('.pin'); if (c) { lastFocus = null; select(+c.dataset.id, false); } });
+/* ---------- zoom & pan: Ctrl/⌘ + scroll or pinch to zoom, drag to move, buttons for everyone ---------- */
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+function toUser(cx, cy){ const r = svg.getBoundingClientRect(), s = scale();
+  const ox = r.left + (r.width - vb[2]*s)/2, oy = r.top + (r.height - vb[3]*s)/2;
+  return [vb[0] + (cx-ox)/s, vb[1] + (cy-oy)/s]; }
+function zoomBy(f, cx, cy){
+  cancelAnimationFrame(anim);
+  const r = svg.getBoundingClientRect(); if (cx == null) { cx = r.left + r.width/2; cy = r.top + r.height/2; }
+  const [ux,uy] = toUser(cx,cy); let w = vb[2]*f; w = Math.max(20, Math.min(BASE.vw*1.15, w));
+  const k = w / vb[2]; vb = [ux-(ux-vb[0])*k, uy-(uy-vb[1])*k, vb[2]*k, vb[3]*k]; paint();
+}
+let hintT;
+svg.addEventListener('wheel', e => {
+  if (e.ctrlKey || e.metaKey) { e.preventDefault();
+    const dy = e.deltaMode === 1 ? e.deltaY*33 : e.deltaY;
+    zoomBy(Math.exp(Math.max(-60, Math.min(60, dy)) * 0.01), e.clientX, e.clientY); return; }
+  const h = $('zhint'); h.textContent = IS_MAC ? t().zhintMac : t().zhint; h.classList.remove('off');
+  clearTimeout(hintT); hintT = setTimeout(() => h.classList.add('off'), 1400);
+}, {passive:false});
+let gs = 1;   // Safari trackpad and iPhone pinch
+svg.addEventListener('gesturestart', e => { e.preventDefault(); gs = 1; });
+svg.addEventListener('gesturechange', e => { e.preventDefault(); zoomBy(gs / e.scale, e.clientX, e.clientY); gs = e.scale; });
+let drag = null, dragged = false;
+svg.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; drag = {x:e.clientX, y:e.clientY, vb:vb.slice()}; dragged = false; });
+addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX-drag.x, dy = e.clientY-drag.y;
+  if (!dragged && Math.hypot(dx,dy) < 4) return;
+  if (!dragged) { dragged = true; cancelAnimationFrame(anim); svg.classList.add('grabbing'); }
+  const s = scale(); vb = [drag.vb[0]-dx/s, drag.vb[1]-dy/s, vb[2], vb[3]]; paint(); });
+addEventListener('pointerup', () => { if (drag) { drag = null; svg.classList.remove('grabbing'); setTimeout(() => dragged = false, 0); } });
+$('zin').onclick = () => zoomBy(0.6);
+$('zout').onclick = () => zoomBy(1/0.6);
+$('zreset').onclick = () => { if (active === 'search' && S) applySearch(true); else flyTo(boxFor(active === 'search' ? lastK : active)); };
+svg.addEventListener('click', ev => { if (dragged) return; const c = ev.target.closest('.pin'); if (c) { lastFocus = null; select(+c.dataset.id, false); } });
 function hover(id){ document.querySelectorAll('.pin.hl').forEach(c=>c.classList.remove('hl')); for (const k in pins) pins[k].style.opacity = ''; if (id!=null && pins[id]) { pins[id].style.opacity = 1; pins[id].setAttribute('stroke-width',3); } else paint(); }
 
 /* ---------- detail ---------- */
@@ -455,14 +503,14 @@ function select(id, fromList){
     <div class="addr">${x.addr ? esc(x.addr) : esc(L.nofixed)}</div>
     <div class="btns">${dir}${web}</div>
     <dl>${rows}${phone}${mail}${soc}</dl>${x.mission?`<div class="mission">${link(x.mission)}</div>`:''}`;
-  $('detail').hidden = false; $('detail').scrollTop = 0;
+  $('detail').hidden = false; $('detail').scrollTop = 0; $('mapcol').classList.add('sheet-open');
   $('dclose').onclick = () => closeDetail(true);
   if (fromList) $('dclose').focus({preventScroll:true});
   document.querySelectorAll('.row[aria-current]').forEach(b=>b.removeAttribute('aria-current'));
   document.querySelectorAll(`.row[data-id="${id}"]`).forEach(b=>b.setAttribute('aria-current','true'));
   paint();
 }
-function closeDetail(refocus){ $('detail').hidden = true; sel = null;
+function closeDetail(refocus){ $('detail').hidden = true; sel = null; $('mapcol').classList.remove('sheet-open');
   document.querySelectorAll('.row[aria-current]').forEach(b=>b.removeAttribute('aria-current'));
   if (refocus && lastFocus) lastFocus.focus({preventScroll:true}); paint(); }
 document.addEventListener('keydown', e => { if (e.key==='Escape' && !$('detail').hidden) closeDetail(true); });
@@ -562,7 +610,7 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() 
   // Scrolling up past the top of this page continues back to the homepage Gallery
   function atTop(){ return (window.scrollY || document.documentElement.scrollTop || 0) <= 2; }
   addEventListener('wheel', function(e){
-    if (Date.now() - t0 < 700) return;
+    if (Date.now() - t0 < 700 || e.ctrlKey || e.metaKey) return;
     var dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY;
     if (dy >= 0 || !atTop() || (e.target.closest && e.target.closest('#sres, #detail'))) { pullUp = 0; return; }
     var now = Date.now(); if (now - pt > 900) pullUp = 0; pt = now;
