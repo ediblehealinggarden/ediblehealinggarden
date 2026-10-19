@@ -126,6 +126,10 @@ body.leaving{animation:pageOut .4s ease forwards}
 .fwy rect{fill:var(--panel);stroke:var(--road)}
 .fwy text{fill:var(--ink);font-family:var(--body);font-weight:700;pointer-events:none}
 .fwy{pointer-events:none}
+.selring{fill:none;stroke:var(--clay);stroke-width:2.5;pointer-events:none}
+.selpulse{fill:none;stroke:var(--clay);stroke-width:2;pointer-events:none;opacity:0;transform-box:fill-box;transform-origin:center}
+.sellbl{fill:var(--ink);font-family:var(--body);font-weight:700;paint-order:stroke;stroke:var(--halo);stroke-linejoin:round;pointer-events:none}
+@media (prefers-reduced-motion:no-preference){.selpulse.go{animation:selpulse 1.3s ease-out 3}@keyframes selpulse{0%{transform:scale(.5);opacity:.9}100%{transform:scale(2.1);opacity:0}}}
 .lmk rect{fill:var(--panel);stroke:var(--muted)}
 .lmk text{fill:var(--muted);font-family:var(--body);font-style:italic;font-weight:500;paint-order:stroke;stroke:var(--halo);stroke-linejoin:round}
 .lmk{pointer-events:none}
@@ -425,8 +429,8 @@ function paint(){
   for (const id in pins){ const c = pins[id], e = DATA[id], on = active==='search' ? SSET.has(+id) : active==='intro'||active==='all'||active==='home' ? true : e.r===active;
     c.setAttribute('r', ((sel==id?10:on?(near?7:5.5):3.5)/s).toFixed(2));
     c.setAttribute('stroke-width', sel==id?3:1.5);
-    const ef = e.r ? effF(e.r) : F; c.style.display = (ef==='all' || e.cat===ef) ? '' : 'none';
-    c.classList.toggle('dim', !on); c.classList.toggle('sel', sel==id); }
+    const ef = e.r ? effF(e.r) : F; c.style.display = (ef==='all' || e.cat===ef || sel==id) ? '' : 'none';
+    c.classList.toggle('dim', !on && sel!=id); c.classList.toggle('sel', sel==id); }
   if (sel !== null && pins[sel]) pins[sel].parentNode.appendChild(pins[sel]);
   labelEls.forEach(([tx,big]) => { const show = big===1 || (big===2 ? vb[2] > 160 : near);
     tx.style.display = show ? '' : 'none'; tx.setAttribute('font-size', ((big===1?11:big===2?13:11.5)/s).toFixed(2)); tx.setAttribute('stroke-width', (3.5/s).toFixed(2)); });
@@ -442,6 +446,38 @@ function paint(){
     svg.appendChild(srch[0]); svg.appendChild(srch[1]); }
   else { srch[0].style.display='none'; srch[1].style.display='none'; }
   svg.appendChild(homeEls[0]); svg.appendChild(homeEls[1]);
+  paintSel(s);
+}
+let selEls = null;
+function paintSel(s){
+  if (!selEls) selEls = [el('circle',{class:'selpulse','vector-effect':'non-scaling-stroke'}), el('circle',{class:'selring','vector-effect':'non-scaling-stroke'}), el('text',{class:'sellbl','text-anchor':'middle'})];
+  const e = sel !== null ? DATA[sel] : null, on = e && e.lat != null;
+  selEls.forEach(n => n.style.display = on ? '' : 'none'); if (!on) return;
+  const [x,y] = P(e.lat,e.lng);
+  selEls[0].setAttribute('cx',x); selEls[0].setAttribute('cy',y); selEls[0].setAttribute('r',(16/s).toFixed(2));
+  selEls[1].setAttribute('cx',x); selEls[1].setAttribute('cy',y); selEls[1].setAttribute('r',(15/s).toFixed(2));
+  const t = selEls[2]; t.textContent = d(e).name.split('\n')[0]; t.setAttribute('x',x); t.setAttribute('y',y-22/s);
+  t.setAttribute('font-size',(13/s).toFixed(2)); t.setAttribute('stroke-width',(4/s).toFixed(2));
+  selEls.forEach(n => svg.appendChild(n));
+}
+// Fly the map to a place: zoom to neighborhood level and center the pin in the part of the map the pop-up doesn't cover
+function focusPin(id){
+  const e = DATA[id]; if (!e || e.lat == null) return;
+  const r = svg.getBoundingClientRect(); if (!r.width || !r.height) return;
+  let fx0 = 0, fy0 = 56, fx1 = r.width, fy1 = r.height;
+  const dt = $('detail');
+  if (!dt.hidden){ const q = dt.getBoundingClientRect();
+    const ox0 = Math.max(q.left,r.left), ox1 = Math.min(q.right,r.right), oy0 = Math.max(q.top,r.top), oy1 = Math.min(q.bottom,r.bottom);
+    if (ox1 > ox0 && oy1 > oy0){ const leftW = ox0 - r.left, topH = oy0 - r.top;
+      if (leftW*r.height >= topH*r.width) fx1 = leftW - 12; else fy1 = topH - 8; } }
+  if (fx1 - fx0 < 90) { fx0 = 0; fx1 = r.width; }
+  if (fy1 - fy0 < 90) { fy0 = 0; fy1 = r.height; }
+  const s0 = scale(), [x,y] = P(e.lat,e.lng);
+  const sx = (x - vb[0])*s0 + (r.width - vb[2]*s0)/2, sy = (y - vb[1])*s0 + (r.height - vb[3]*s0)/2;
+  const W = Math.min(vb[2], 70), inside = sx > fx0+30 && sx < fx1-30 && sy > fy0+30 && sy < fy1-30;
+  if (!(inside && vb[2] <= 70)) { const s = r.width / W; holdIO = Date.now() + 1300;
+    flyTo([x - (fx0+fx1)/2/s, y - (fy0+fy1)/2/s, W, r.height/s]); }
+  if (selEls){ const p = selEls[0]; p.classList.remove('go'); void p.getBBox(); setTimeout(() => p.classList.add('go'), inside ? 0 : 650); }
 }
 function paintStreets(s){
   const w = vb[2], bucket = Math.round(Math.log2(s)*3);
@@ -552,7 +588,7 @@ function select(id, fromList){
   if (fromList) $('dclose').focus({preventScroll:true});
   document.querySelectorAll('.row[aria-current]').forEach(b=>b.removeAttribute('aria-current'));
   document.querySelectorAll(`.row[data-id="${id}"]`).forEach(b=>b.setAttribute('aria-current','true'));
-  paint();
+  paint(); focusPin(id);
 }
 // closest main intersection and a well-known landmark, to help people picture where a place is
 function nearHTML(id){
