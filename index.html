@@ -12,6 +12,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
 <title>Edible Healing Garden</title>
 <meta name="description" content="A hospital-based community garden at Los Angeles General Hospital promoting food equity, nutrition and gardening education, and access to nature for the medically underserved.">
 <link rel="icon" type="image/png" href="images/favicon.png">
+<link rel="preload" href="images/logo.webp" as="image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sorts+Mill+Goudy&family=Outfit:wght@600;700&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,500&display=swap" rel="stylesheet">
@@ -705,6 +706,7 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   // Phones and small windows: a further scroll or swipe at the very bottom continues on
   var pull = 0, pullT = 0;
   window.addEventListener('wheel', function(e){
+    if (typeof quietUntil !== 'undefined' && Date.now() < quietUntil) return;
     if (body.classList.contains('panels') || e.deltaY <= 0 || !atBottom()) { pull = 0; return; }
     var now = Date.now(); if (now - pullT > 700) pull = 0; pullT = now;
     pull += e.deltaY; if (pull > 260) goNextPage();
@@ -786,7 +788,12 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     return p.scrollTop > 0;
   }
 
+  // Right after arriving from another page, ignore leftover trackpad/mouse momentum until it stops
+  var quietUntil = Date.now() + 900;
+  function inArrivalQuiet(e){ if (Date.now() < quietUntil) { quietUntil = Math.max(quietUntil, Date.now() + 250); if (e.cancelable) e.preventDefault(); return true; } return false; }
+  addEventListener('pageshow', function(e){ if (e.persisted) quietUntil = Date.now() + 900; });
   frame.addEventListener('wheel', function(e){
+    if (inArrivalQuiet(e)) return;
     if (!body.classList.contains('panels') || lightbox.open) return;
     if (Math.abs(e.deltaY) < 12) return;
     if (locked) { e.preventDefault(); return; }   // ignore leftover trackpad momentum right after a page turn
