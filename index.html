@@ -2,6 +2,7 @@
 <html lang="en">
 <script>
 document.documentElement.classList.add("js");
+if (window.CSSViewTransitionRule && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('vt');
 // Donor wall: show the company name if its logo file isn't uploaded yet (defined early so it's ready before images load)
 function swapToName(img){ var s=document.createElement('span'); s.className='name'; s.textContent=img.alt; img.replaceWith(s); }
 </script>
@@ -316,6 +317,19 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
   body{animation:pageIn .5s ease both}
   body.leaving{animation:pageOut .4s ease forwards}
   @media (prefers-reduced-motion:reduce){body,body.leaving{animation:none}}
+  /* ============ Keep the menu still between pages ============
+     Browsers that support cross-page view transitions (Chrome, Edge, Safari 18.2+) fade only the page content;
+     the menu is captured as its own layer and stays put. Other browsers use the whole-page fade above. */
+  @media (prefers-reduced-motion:no-preference){
+    @view-transition{navigation:auto}
+    ::view-transition-old(root){animation:vtOut .35s ease both}
+    ::view-transition-new(root){animation:vtIn .45s ease .2s both}
+  }
+  @keyframes vtOut{to{opacity:0}}
+  @keyframes vtIn{from{opacity:0}}
+  .side{view-transition-name:site-nav}
+  html.vt body{animation:none}
+
 </style>
 </head>
 <body>
@@ -877,8 +891,27 @@ function swapToName(img){ var s=document.createElement('span'); s.className='nam
     if (url.pathname === location.pathname && url.search === location.search) return;
     e.preventDefault(); goTo(url.href);
   });
+  // Move the menu highlight to the page we're heading to, so the menu looks the same before and after
+  var navBefore = null;
+  function markNav(href){
+    var to; try { to = new URL(href, location.href); } catch (err) { return; }
+    var links = document.querySelectorAll('.nav a');
+    navBefore = Array.prototype.filter.call(links, function(a){ return a.hasAttribute('aria-current'); })[0] || null;
+    var key = /find-food/.test(to.pathname) ? 'find-food' : (to.hash || '#home');
+    links.forEach(function(a){
+      var h = a.getAttribute('href'), k = /find-food/.test(h) ? 'find-food' : (h.indexOf('#') >= 0 ? h.slice(h.indexOf('#')) : '#home');
+      if (k === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
+  // Coming back with the Back button: put the highlight back where it was
+  addEventListener('pageshow', function(e){
+    if (!e.persisted || !navBefore) return;
+    document.querySelectorAll('.nav a').forEach(function(a){ a.removeAttribute('aria-current'); });
+    navBefore.setAttribute('aria-current', 'page');
+  });
   function goTo(href){
     if (reduce.matches) { location.href = href; return; }
+    if (document.documentElement.classList.contains('vt')) { markNav(href); location.href = href; return; }   // the browser fades the content, menu stays
     document.body.classList.add('leaving');
     setTimeout(function(){ location.href = href; }, 400);
   }
