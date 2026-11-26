@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#2E6A3E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bed Log">
+<title>Garden Bed Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<style>
+:root{
+  /* Layout idea: nursery stake tags. Each bed is a numbered stake; plantings hang off it as labeled rows. */
+  --bg:#F1F3EA; --surface:#FFFFFF; --ink:#17261D; --muted:#5A6A5F; --line:#D8DECF;
+  --leaf:#2E6A3E; --leaf-ink:#FFFFFF; --sun:#E9A820; --sun-ink:#2A1D00; --clay:#B24A2B; --soft:#E6EBDD;
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0F1913; --surface:#17241C; --ink:#E8EFE4; --muted:#9AAA9F; --line:#284033;
+    --leaf:#6DBB80; --leaf-ink:#0B1D11; --sun:#F0B93A; --sun-ink:#2A1D00; --clay:#E58A6B; --soft:#1F3026;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.45 var(--body);-webkit-text-size-adjust:100%}
+body.lock{overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 120px}
+header{padding:20px 0 8px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font:800 30px/1.1 var(--display);margin:4px 0 0}
+h2{font:700 21px/1.2 var(--display);margin:0;text-wrap:balance;overflow-wrap:anywhere}
+h3{font:700 16px/1.2 var(--display);margin:18px 0 8px}
+.tabs{display:flex;gap:4px;margin:14px 0 18px;padding:4px;background:var(--soft);border-radius:12px}
+.tabs button{flex:1;border:0;background:transparent;padding:10px 6px;border-radius:9px;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.summary{color:var(--muted);margin:0 0 14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:560px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.bed{position:relative;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:6px 6px 14px 14px;padding:14px 12px 12px;min-width:0;display:flex;flex-direction:column;gap:8px;min-height:150px}
+.bed::before{content:"";position:absolute;left:50%;top:-1px;width:36px;height:5px;margin-left:-18px;background:var(--leaf);border-radius:0 0 4px 4px}
+.bed .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.bed .num{font:800 38px/1 var(--display);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.bed ul{list-style:none;margin:0;padding:0;font-size:14px;display:flex;flex-direction:column;gap:2px}
+.bed li{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.none{color:var(--muted);font-size:14px}
+.bed.add{border-style:dashed;align-items:center;justify-content:center;color:var(--muted);font-weight:600;background:transparent}
+.bed.add::before{display:none}
+.thumbs{display:flex;gap:4px;margin-top:auto;flex-wrap:wrap}
+.thumbs img{width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid var(--line);background:var(--soft)}
+.row{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;margin:0 0 10px}
+.row .ph{flex:none;width:64px;height:64px;border-radius:8px;object-fit:cover;background:var(--soft);display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
+.row .main{min-width:0;flex:1}
+.row .name{font-weight:600;overflow-wrap:anywhere}
+.meta{font-size:13px;color:var(--muted)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--ink);margin-right:6px;white-space:nowrap}
+.pill.s-Growing,.pill.s-Transplanted{background:var(--leaf);color:var(--leaf-ink)}
+.pill.s-Seeds{background:var(--sun);color:var(--sun-ink)}
+.pill.s-Harvested{background:transparent;border:1px solid var(--leaf);color:var(--leaf)}
+.pill.s-Removed{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.pill.lesson{background:var(--sun);color:var(--sun-ink)}
+.tag{display:inline-block;font-weight:700;font-size:12px;padding:2px 8px;border-radius:5px;background:var(--ink);color:var(--bg);margin-right:6px}
+.back{border:0;background:transparent;color:var(--leaf);font-weight:600;padding:8px 0;margin-bottom:4px}
+.bar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:0 0 14px;flex-wrap:wrap}
+.btn{border:0;border-radius:10px;padding:11px 16px;font-weight:600;background:var(--leaf);color:var(--leaf-ink)}
+.btn.alt{background:var(--soft);color:var(--ink)}
+.btn.danger{background:transparent;color:var(--clay);border:1px solid var(--clay)}
+.btn.small{padding:7px 12px;font-size:14px}
+.btn:disabled{opacity:.6;cursor:default}
+.link{border:0;background:transparent;color:var(--leaf);font-weight:600;padding:6px 0;text-decoration:underline}
+.fab{position:fixed;right:max(16px,calc(50% - 344px));bottom:20px;z-index:5;border:0;border-radius:99px;padding:15px 22px;background:var(--sun);color:var(--sun-ink);font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.28)}
+.empty{border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--muted);text-align:center}
+.empty strong{display:block;color:var(--ink);font:700 18px var(--display);margin-bottom:4px}
+.search{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font-weight:600;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--leaf);color:var(--leaf-ink);border-color:var(--leaf)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:15px}
+.facts dt{color:var(--muted);font-weight:600;font-size:13px;padding-top:2px}
+.facts dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.strip{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;margin:0 0 12px}
+.strip img{flex:none;width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid var(--line);scroll-snap-align:start;cursor:zoom-in;background:var(--soft)}
+.timeline{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--line)}
+.timeline li{position:relative;margin:0 0 12px}
+.timeline li::before{content:"";position:absolute;left:-21px;top:16px;width:12px;height:12px;border-radius:50%;background:var(--leaf);border:2px solid var(--bg)}
+.timeline li.start::before{background:var(--sun)}
+.tl{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tl .when{font-weight:600}
+.tl p{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.tl .thumbs img{width:56px;height:56px}
+.scrim{position:fixed;inset:0;background:rgba(8,16,11,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:600px;max-height:94%;overflow:auto;border-radius:20px 20px 0 0;padding:0 16px 24px}
+@media (min-width:640px){.scrim{align-items:center}.sheet{border-radius:20px;max-height:90%}}
+.sheet-head{position:sticky;top:0;background:var(--bg);display:flex;justify-content:space-between;align-items:center;padding:16px 0 10px;z-index:1;gap:10px}
+.icon{flex:none;border:0;background:var(--soft);width:36px;height:36px;border-radius:50%;font-size:20px;line-height:1}
+.field{display:flex;flex-direction:column;gap:5px;margin:0 0 14px;min-width:0}
+.field>label,.field>.l{font-size:13px;font-weight:600;color:var(--muted)}
+.field input,.field select,.field textarea{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+.check{display:flex;gap:10px;align-items:center;margin:0 0 14px;font-weight:600}
+.check input{width:22px;height:22px;accent-color:var(--leaf)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.two>*{min-width:0}
+fieldset{border:1px solid var(--line);border-radius:12px;padding:12px 12px 0;margin:0 0 14px}
+legend{font:700 15px var(--display);padding:0 6px}
+.photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.tile{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:0}
+.tile img{display:block;width:100%;aspect-ratio:1;object-fit:cover;cursor:zoom-in;background:var(--soft)}
+.tile select{width:100%;border:0;border-top:1px solid var(--line);padding:6px 4px;font-size:13px;background:var(--surface)}
+.tile .x{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:16px;line-height:1}
+.picks{display:flex;gap:8px;margin-bottom:14px}
+.picks .btn{flex:1}
+.lightbox{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:12px}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain}
+.toast{position:fixed;left:50%;top:max(16px,env(safe-area-inset-top));transform:translateX(-50%);z-index:50;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;max-width:90%;font-weight:500}
+.note{background:var(--soft);border-radius:12px;padding:12px 14px;margin:0 0 14px}
+.actions{display:flex;gap:8px;justify-content:space-between;margin-top:6px}
+.gate{max-width:380px;margin:40px auto 0;text-align:center}
+.gate p{color:var(--muted)}
+.gate input{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:18px;text-align:center;margin:8px 0 12px}
+.gate .btn{width:100%;padding:14px}
+.src{width:100%;text-align:left}
+.bars{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--soft);margin:8px 0 4px}
+.bars span{display:block;height:100%}
+.o-Thrived{background:var(--leaf)}.o-Did{background:#8DBF73}.o-Struggled{background:var(--sun)}.o-Failed{background:var(--clay)}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+(function(){
+  var SUPABASE_URL='https://jxladhbxkmhoabgadpal.supabase.co';
+  var SUPABASE_KEY='sb_publishable_PPIbL4TpKcgkPWXz7-f6og_8mSB_L7-';
+  var STATUSES=['Seeds started','Transplanted','Growing','Harvested','Removed'];
+  var DONE=['Harvested','Removed'];
+  var OUTCOMES=['Thrived','Did okay','Struggled','Failed'];
+  var KINDS=['Tray','Seed packet','Plant','Other'];
+  var SOURCE_TYPES=['Seed packet','Seedling / transplant','Seed library or swap','Donated','Saved from our garden'];
+  var ACTIONS=['Watered','Fertilized','Pruned','Thinned','Weeded','Mulched','Pest spotted','Treated pests','Transplanted','Harvested'];
+
+  var app=document.getElementById('app');
+  var sb=null, phase='loading', errMsg='';
+  var plantings=[], checkins=[], beds=[];
+  var view={tab:'beds',bed:null,pid:null,filter:'Active',q:'',src:null,trash:false};
+  var urlCache={};
+
+  /* ---------- helpers ---------- */
+  function h(tag,props){
+    var e=document.createElement(tag), p=props||{};
+    for(var k in p){
+      var v=p[k]; if(v==null||v===false) continue;
+      if(k==='class') e.className=v;
+      else if(k.indexOf('on')===0) e.addEventListener(k.slice(2),v);
+      else if(k==='text') e.textContent=v;
+      else if(k==='for'||k==='list'||k.indexOf('-')>0) e.setAttribute(k,v);
+      else if(k in e) e[k]=v;
+      else e.setAttribute(k,v===true?'':v);
+    }
+    for(var i=2;i<arguments.length;i++){
+      var list=[].concat(arguments[i]);
+      for(var j=0;j<list.length;j++){var c=list[j]; if(c==null||c===false) continue; e.append(c.nodeType?c:document.createTextNode(String(c)));}
+    }
+    return e;
+  }
+  function uuid(){
+    if(window.crypto&&crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);});
+  }
+  function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function fmtDate(s){if(!s) return ''; var d=new Date(String(s).slice(0,10)+'T00:00:00'); return isNaN(d)?'':d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
+  function clean(s){s=(s==null?'':String(s)).trim(); return s||null;}
+  function num(s){if(s==null||String(s).trim()==='') return null; var n=parseInt(s,10); return isNaN(n)?null:n;}
+  function savedName(){try{return localStorage.getItem('garden-name')||'';}catch(e){return '';}}
+  function saveName(n){try{localStorage.setItem('garden-name',n);}catch(e){}}
+  function toast(msg){document.querySelectorAll('.toast').forEach(function(x){x.remove();});var t=h('div',{class:'toast',role:'status',text:msg});document.body.append(t);setTimeout(function(){t.remove();},3800);}
+  function errText(e){return (e&&(e.message||e.error_description))||String(e);}
+  function uniq(arr){var s={};arr.forEach(function(v){if(v) s[String(v).trim()]=1;});return Object.keys(s).filter(Boolean).sort(function(a,b){return a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});});}
+  function live(){return plantings.filter(function(p){return !p.deleted_at;});}
+  function liveChecks(){return checkins.filter(function(c){return !c.deleted_at;});}
+  function isActive(p){return DONE.indexOf(p.status)<0;}
+  function bedNames(){return uniq(beds.map(function(b){return b.name;}).concat(live().map(function(p){return p.bed;})));}
+  function peopleNames(){return uniq(plantings.map(function(p){return p.logged_by;}).concat(plantings.map(function(p){return p.updated_by;}),checkins.map(function(c){return c.logged_by;})));}
+  function plantNames(){return uniq(plantings.map(function(p){return p.plant;}));}
+  function sourceNames(){return uniq(plantings.map(function(p){return p.source;}));}
+  function plantsIn(bed){return live().filter(function(p){return p.bed===bed;}).sort(function(a,b){return (isActive(b)-isActive(a))||String(b.created_at).localeCompare(String(a.created_at));});}
+  function checksFor(pid){return liveChecks().filter(function(c){return c.planting_id===pid;}).sort(function(a,b){return String(b.date).localeCompare(String(a.date))||String(b.created_at).localeCompare(String(a.created_at));});}
+  function allPhotos(p){
+    var out=(p.photos||[]).slice();
+    checksFor(p.id).forEach(function(c){(c.photos||[]).forEach(function(x){out.push(x);});});
+    return out;
+  }
+  function firstPath(p){var a=p.photos||[]; if(a.length) return a[0].path; var c=checksFor(p.id).find(function(c){return c.photos&&c.photos.length;}); return c?c.photos[0].path:null;}
+  function germ(p){if(p.sown>0&&p.sprouted!=null) return Math.round(100*p.sprouted/p.sown); return null;}
+  function datalist(id,values){return h('datalist',{id:id},values.map(function(v){return h('option',{value:v});}));}
+
+  /* ---------- photos ---------- */
+  function photo(path,cls,alt){
+    var img=h('img',{class:cls||null,alt:alt||'',loading:'lazy'});
+    img.dataset.path=path;
+    var c=urlCache[path]; if(c&&c.exp>Date.now()) img.src=c.url;
+    img.addEventListener('click',function(ev){if(img.src){ev.stopPropagation();lightbox(img.src);}});
+    return img;
+  }
+  async function resolvePhotos(){
+    var imgs=[].slice.call(document.querySelectorAll('img[data-path]')).filter(function(i){return !i.getAttribute('src');});
+    if(!imgs.length) return;
+    var need=uniq(imgs.map(function(i){return i.dataset.path;}).filter(function(p){var c=urlCache[p];return !(c&&c.exp>Date.now());}));
+    for(var i=0;i<need.length;i+=100){
+      var batch=need.slice(i,i+100);
+      try{
+        var r=await sb.storage.from('photos').createSignedUrls(batch,21600);
+        (r.data||[]).forEach(function(d){if(d.signedUrl) urlCache[d.path]={url:d.signedUrl,exp:Date.now()+21000*1000};});
+      }catch(e){}
+    }
+    imgs.forEach(function(img){var c=urlCache[img.dataset.path]; if(c) img.src=c.url;});
+  }
+  function shrink(file){
+    return new Promise(function(resolve){
+      try{
+        var url=URL.createObjectURL(file), img=new Image();
+        img.onload=function(){
+          var s=Math.min(1,1400/Math.max(img.naturalWidth,img.naturalHeight));
+          var c=document.createElement('canvas'); c.width=Math.round(img.naturalWidth*s); c.height=Math.round(img.naturalHeight*s);
+          c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+          c.toBlob(function(b){resolve(b||file);},'image/jpeg',0.8);
+        };
+        img.onerror=function(){URL.revokeObjectURL(url);resolve(file);};
+        img.src=url;
+      }catch(e){resolve(file);}
+    });
+  }
+  async function uploadAll(list){
+    var out=[];
+    for(var i=0;i<list.length;i++){
+      var p=list[i];
+      if(!p.path){
+        var blob=await shrink(p.file), d=new Date();
+        var path=d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+uuid()+'.jpg';
+        var r=await sb.storage.from('photos').upload(path,blob,{contentType:'image/jpeg',upsert:false});
+        if(r.error) throw r.error;
+        p.path=path; urlCache[path]={url:p.url,exp:Date.now()+3600*1000};
+      }
+      out.push({path:p.path,kind:p.kind});
+    }
+    return out;
+  }
+  function photoPicker(initial,defaultKinds){
+    var st=(initial||[]).map(function(p){return {path:p.path,kind:p.kind||'Other'};});
+    var grid=h('div',{class:'photos'});
+    function guess(){
+      for(var i=0;i<defaultKinds.length;i++){var k=defaultKinds[i]; if(!st.some(function(p){return p.kind===k;})) return k;}
+      return 'Other';
+    }
+    function add(files){Array.prototype.forEach.call(files,function(f){st.push({file:f,url:URL.createObjectURL(f),kind:guess()});});draw();}
+    function draw(){
+      grid.replaceChildren();
+      st.forEach(function(p,i){
+        var img=p.path?photo(p.path,null,p.kind+' photo'):h('img',{src:p.url,alt:p.kind+' photo',onclick:function(){lightbox(p.url);}});
+        var sel=h('select',{'aria-label':'Photo type',onchange:function(){p.kind=sel.value;}},KINDS.map(function(k){return h('option',{value:k,text:k,selected:p.kind===k});}));
+        grid.append(h('div',{class:'tile'},img,h('button',{class:'x',type:'button','aria-label':'Remove photo',text:'×',onclick:function(){st.splice(i,1);draw();}}),sel));
+      });
+      resolvePhotos();
+    }
+    var cam=h('input',{type:'file',accept:'image/*',capture:'environment',hidden:true,onchange:function(e){add(e.target.files);e.target.value='';}});
+    var lib=h('input',{type:'file',accept:'image/*',multiple:true,hidden:true,onchange:function(e){add(e.target.files);e.target.value='';}});
+    draw();
+    return {
+      el:h('div',null,grid,h('div',{class:'picks'},
+        h('button',{class:'btn alt',type:'button',text:'Take photo',onclick:function(){cam.click();}}),
+        h('button',{class:'btn alt',type:'button',text:'Choose photos',onclick:function(){lib.click();}})),cam,lib),
+      list:st
+    };
+  }
+
+  /* ---------- overlays ---------- */
+  function sheet(title,build){
+    var scrim=h('div',{class:'scrim'});
+    function close(){scrim.remove();if(!document.querySelector('.scrim')) document.body.classList.remove('lock');}
+    var box=h('div',{class:'sheet',role:'dialog','aria-modal':'true','aria-label':title},
+      h('div',{class:'sheet-head'},h('h2',{text:title}),h('button',{class:'icon',type:'button','aria-label':'Close',text:'×',onclick:close})));
+    box.append(build(close)); scrim.append(box);
+    scrim.addEventListener('click',function(e){if(e.target===scrim) close();});
+    document.body.append(scrim); document.body.classList.add('lock');
+    return close;
+  }
+  function lightbox(url){var lb=h('div',{class:'lightbox',role:'dialog','aria-label':'Photo',onclick:function(){lb.remove();}},h('img',{src:url,alt:'Enlarged photo'}));document.body.append(lb);}
+  function ask(title,msg,ok){
+    return new Promise(function(resolve){
+      sheet(title,function(close){
+        var done=false; function fin(v){if(done) return; done=true; close(); resolve(v);}
+        return h('div',null,h('p',{text:msg}),h('div',{class:'actions'},
+          h('button',{class:'btn alt',type:'button',text:'Cancel',onclick:function(){fin(false);}}),
+          h('button',{class:'btn danger',type:'button',text:ok,onclick:function(){fin(true);}})));
+      });
+    });
+  }
+  function whoField(id,label){
+    var inp=h('input',{id:id,type:'text',value:savedName(),placeholder:'Start typing your name',list:id+'-list',autocomplete:'off',autocapitalize:'words'});
+    return {inp:inp,el:h('div',{class:'field'},h('label',{for:id,text:label}),inp,datalist(id+'-list',peopleNames()))};
+  }
+  function field(id,label,ctrl,extra){return h('div',{class:'field'},h('label',{for:id,text:label}),ctrl,extra||null);}
+  function select(id,options,value,blank){
+    var s=h('select',{id:id});
+    if(blank!=null) s.append(h('option',{value:'',text:blank}));
+    options.forEach(function(o){s.append(h('option',{value:o,text:o,selected:value===o}));});
+    return s;
+  }
+  async function refresh(){await load(); render();}
+  function saving(btn,on){btn.disabled=on; btn.textContent=on?'Saving…':'Save';}
+
+  /* ---------- planting editor ---------- */
+  function openPlanting(p,presetBed){
+    var isNew=!p; p=p||{};
+    sheet(isNew?'Add to the garden':'Edit planting',function(close){
+      var pics=photoPicker(p.photos,['Tray','Seed packet']);
+      var who=whoField('f-who',isNew?'Logged by':'Edited by');
+      var bedVal=p.bed||presetBed||'';
+      var bedInp=h('input',{id:'f-bed',type:'text',value:bedVal,placeholder:'Type a bed number or name',autocomplete:'off'});
+      var chipBox=h('div',{class:'chips'});
+      function paint(){chipBox.replaceChildren();bedNames().forEach(function(n){chipBox.append(h('button',{class:'chip',type:'button','aria-pressed':String(bedInp.value.trim()===n),text:n,onclick:function(){bedInp.value=n;paint();}}));});}
+      bedInp.addEventListener('input',paint); paint();
+      var plant=h('input',{id:'f-plant',type:'text',value:p.plant||'',placeholder:'e.g. Cherokee Purple tomato',list:'f-plant-list',autocomplete:'off'});
+      var variety=h('input',{id:'f-var',type:'text',value:p.variety||'',placeholder:'Optional'});
+      var date=h('input',{id:'f-date',type:'date',value:p.date_started||today()});
+      var status=select('f-status',STATUSES,p.status||'Seeds started');
+      var source=h('input',{id:'f-src',type:'text',value:p.source||'',placeholder:'Brand, nursery or person',list:'f-src-list',autocomplete:'off'});
+      var stype=select('f-stype',SOURCE_TYPES,p.source_type||'Seed packet','Choose one');
+      var year=h('input',{id:'f-year',type:'number',inputmode:'numeric',min:1990,max:2100,value:p.packed_year==null?'':p.packed_year,placeholder:'e.g. 2026'});
+      var sown=h('input',{id:'f-sown',type:'number',inputmode:'numeric',min:0,value:p.sown==null?'':p.sown,placeholder:'0'});
+      var sprouted=h('input',{id:'f-spr',type:'number',inputmode:'numeric',min:0,value:p.sprouted==null?'':p.sprouted,placeholder:'0'});
+      var outcome=select('f-out',OUTCOMES,p.outcome||'','Choose one');
+      var outNote=h('input',{id:'f-outn',type:'text',value:p.outcome_note||'',placeholder:'Why? e.g. bolted in the heat'});
+      var outBox=h('fieldset',null,h('legend',{text:'How did it turn out?'}),field('f-out','Outcome',outcome),field('f-outn','Why',outNote));
+      function showOut(){outBox.hidden=DONE.indexOf(status.value)<0;}
+      status.addEventListener('change',showOut); showOut();
+      var note=h('textarea',{id:'f-note',rows:3,placeholder:'Spacing, conditions, anything to remember'}); note.value=p.note||'';
+      var lesson=h('input',{id:'f-lesson',type:'checkbox',checked:!!p.is_lesson});
+
+      var save=h('button',{class:'btn',type:'button',text:'Save'});
+      save.addEventListener('click',async function(){
+        var name=who.inp.value.trim(), bed=bedInp.value.trim(), pl=plant.value.trim();
+        if(!name){toast('Add your name so the team knows who logged this.');return;}
+        if(!bed){toast('Choose a bed or type one.');return;}
+        if(!pl){toast('Add the plant name.');return;}
+        saving(save,true);
+        try{
+          var photos=await uploadAll(pics.list);
+          var done=DONE.indexOf(status.value)>-1;
+          var data={bed:bed,plant:pl,variety:clean(variety.value),date_started:date.value||null,status:status.value,
+            source:clean(source.value),source_type:clean(stype.value),packed_year:num(year.value),sown:num(sown.value),sprouted:num(sprouted.value),
+            outcome:done?clean(outcome.value):(p.outcome||null),outcome_note:done?clean(outNote.value):(p.outcome_note||null),
+            note:clean(note.value),is_lesson:lesson.checked,photos:photos,updated_by:name,updated_at:new Date().toISOString()};
+          var r=await sb.from('beds').upsert({name:bed},{onConflict:'name',ignoreDuplicates:true});
+          if(r.error) throw r.error;
+          if(isNew){data.id=uuid(); data.logged_by=name; r=await sb.from('plantings').insert(data);}
+          else r=await sb.from('plantings').update(data).eq('id',p.id);
+          if(r.error) throw r.error;
+          saveName(name); close(); toast(isNew?'Saved to Bed '+bed:'Changes saved');
+          if(isNew){view.tab='beds';view.bed=bed;view.pid=null;}
+          await refresh();
+        }catch(e){toast('Could not save: '+errText(e));saving(save,false);}
+      });
+      var actions=h('div',{class:'actions'});
+      if(!isNew) actions.append(h('button',{class:'btn danger',type:'button',text:'Delete',onclick:async function(){
+        if(!(await ask('Delete this planting?','This moves '+p.plant+' (Bed '+p.bed+') and its check-ins to the trash. You can restore it from the Plants tab.','Move to trash'))) return;
+        var r=await sb.from('plantings').update({deleted_at:new Date().toISOString(),updated_by:who.inp.value.trim()||null}).eq('id',p.id);
+        if(r.error){toast('Could not delete: '+errText(r.error));return;}
+        close(); view.pid=null; toast('Moved to trash'); refresh();
+      }}));
+      else actions.append(h('span'));
+      actions.append(save);
+
+      return h('div',null,
+        pics.el, who.el,
+        h('div',{class:'field'},h('label',{for:'f-bed',text:'Bed'}),chipBox,bedInp),
+        field('f-plant','Plant',plant,datalist('f-plant-list',plantNames())),
+        field('f-var','Variety',variety),
+        h('div',{class:'two'},field('f-date','Date started',date),field('f-status','Stage',status)),
+        h('fieldset',null,h('legend',{text:'Where it came from'}),
+          field('f-src','Source',source,datalist('f-src-list',sourceNames())),
+          h('div',{class:'two'},field('f-stype','Type',stype),field('f-year','Packed for year',year))),
+        h('fieldset',null,h('legend',{text:'Germination'}),
+          h('div',{class:'two'},field('f-sown','Seeds sown',sown),field('f-spr','Sprouted',sprouted))),
+        outBox,
+        field('f-note','Notes',note),
+        h('label',{class:'check',for:'f-lesson'},lesson,'Mark these notes as a lesson learned'),
+        actions);
+    });
+  }
+
+  /* ---------- check-in editor ---------- */
+  function openCheckin(p,c){
+    var isNew=!c; c=c||{};
+    sheet(isNew?'Check in: '+p.plant:'Edit check-in',function(close){
+      var pics=photoPicker(c.photos,['Plant']);
+      var who=whoField('c-who','Checked by');
+      var date=h('input',{id:'c-date',type:'date',value:c.date||today()});
+      var picked=(c.actions||[]).slice();
+      var chips=h('div',{class:'chips'},ACTIONS.map(function(a){
+        var b=h('button',{class:'chip',type:'button','aria-pressed':String(picked.indexOf(a)>-1),text:a});
+        b.addEventListener('click',function(){var i=picked.indexOf(a); if(i>-1) picked.splice(i,1); else picked.push(a); b.setAttribute('aria-pressed',String(i<0));});
+        return b;
+      }));
+      var stage=select('c-stage',STATUSES.filter(function(s){return s!==p.status;}),'','No change (now: '+p.status+')');
+      var outcome=select('c-out',OUTCOMES,p.outcome||'','Choose one');
+      var outNote=h('input',{id:'c-outn',type:'text',value:p.outcome_note||'',placeholder:'Why? e.g. great yield, aphids took over'});
+      var outBox=h('fieldset',null,h('legend',{text:'How did it turn out?'}),field('c-out','Outcome',outcome),field('c-outn','Why',outNote));
+      function showOut(){outBox.hidden=DONE.indexOf(stage.value)<0;}
+      stage.addEventListener('change',showOut); showOut();
+      var note=h('textarea',{id:'c-note',rows:4,placeholder:'How is it doing? What did you do?'}); note.value=c.note||'';
+      var lesson=h('input',{id:'c-lesson',type:'checkbox',checked:!!c.is_lesson});
+
+      var save=h('button',{class:'btn',type:'button',text:'Save'});
+      save.addEventListener('click',async function(){
+        var name=who.inp.value.trim();
+        if(!name){toast('Add your name so the team knows who checked.');return;}
+        if(!picked.length&&!note.value.trim()&&!pics.list.length&&!stage.value){toast('Add a note, a photo or what you did.');return;}
+        saving(save,true);
+        try{
+          var photos=await uploadAll(pics.list);
+          var data={planting_id:p.id,date:date.value||today(),actions:picked,note:clean(note.value),is_lesson:lesson.checked,photos:photos,logged_by:name};
+          var r;
+          if(isNew){data.id=uuid(); r=await sb.from('checkins').insert(data);}
+          else r=await sb.from('checkins').update(data).eq('id',c.id);
+          if(r.error) throw r.error;
+          if(stage.value){
+            var up={status:stage.value,updated_by:name,updated_at:new Date().toISOString()};
+            if(DONE.indexOf(stage.value)>-1){up.outcome=clean(outcome.value);up.outcome_note=clean(outNote.value);}
+            r=await sb.from('plantings').update(up).eq('id',p.id);
+            if(r.error) throw r.error;
+          }
+          saveName(name); close(); toast('Check-in saved'); await refresh();
+        }catch(e){toast('Could not save: '+errText(e));saving(save,false);}
+      });
+      var actions=h('div',{class:'actions'});
+      if(!isNew) actions.append(h('button',{class:'btn danger',type:'button',text:'Delete',onclick:async function(){
+        if(!(await ask('Delete this check-in?','It moves to the trash. You can restore it from the Plants tab.','Move to trash'))) return;
+        var r=await sb.from('checkins').update({deleted_at:new Date().toISOString()}).eq('id',c.id);
+        if(r.error){toast('Could not delete: '+errText(r.error));return;}
+        close(); toast('Moved to trash'); refresh();
+      }}));
+      else actions.append(h('span'));
+      actions.append(save);
+
+      return h('div',null,
+        pics.el, who.el, field('c-date','Date',date),
+        h('div',{class:'field'},h('span',{class:'l',text:'What did you do?'}),chips),
+        field('c-note','Notes',note),
+        h('label',{class:'check',for:'c-lesson'},lesson,'Mark as a lesson learned'),
+        field('c-stage','Update stage',stage), outBox,
+        actions);
+    });
+  }
+
+  function openNewBed(){
+    sheet('Add a bed',function(close){
+      var inp=h('input',{id:'nb',type:'text',placeholder:'Bed number or name',autocomplete:'off'});
+      var btn=h('button',{class:'btn',type:'button',text:'Add bed',onclick:async function(){
+        var n=inp.value.trim(); if(!n){toast('Type a bed number or name.');return;}
+        if(bedNames().indexOf(n)>-1){toast('That bed already exists.');return;}
+        var r=await sb.from('beds').insert({name:n});
+        if(r.error){toast('Could not add the bed: '+errText(r.error));return;}
+        close(); refresh();
+      }});
+      return h('div',null,field('nb','Bed',inp),h('div',{class:'actions'},h('span'),btn));
+    });
+  }
+
+  /* ---------- views ---------- */
+  function statusPill(s){return h('span',{class:'pill s-'+String(s||'').split(' ')[0],text:s||'Seeds started'});}
+  function plantRow(p,showBed){
+    var path=firstPath(p), n=checksFor(p.id).length;
+    return h('button',{class:'row',type:'button',onclick:function(){view.pid=p.id;render();window.scrollTo(0,0);}},
+      path?photo(path,'ph',p.plant+' photo'):h('div',{class:'ph',text:'No photo'}),
+      h('div',{class:'main'},
+        h('div',{class:'name'},showBed?h('span',{class:'tag',text:'Bed '+p.bed}):null,p.plant,p.variety?(' · '+p.variety):''),
+        h('div',{class:'meta'},statusPill(p.status),p.date_started?('Started '+fmtDate(p.date_started)):'',
+          n?(' · '+n+' check-in'+(n>1?'s':'')):'',p.logged_by?(' · by '+p.logged_by):'')));
+  }
+  function viewBeds(){
+    var names=bedNames(), act=live().filter(isActive).length, out=h('div');
+    out.append(h('p',{class:'summary',text:names.length+' bed'+(names.length===1?'':'s')+' · '+act+' growing now'}));
+    if(!names.length){out.append(h('div',{class:'empty'},h('strong',{text:'No beds yet'}),'Tap Add photos, snap your seed tray and packet, and type the bed number. The bed appears here.'));return out;}
+    var g=h('div',{class:'grid'});
+    names.forEach(function(n){
+      var ps=plantsIn(n), on=ps.filter(isActive), shots=[];
+      on.forEach(function(p){var x=firstPath(p); if(x&&shots.length<4) shots.push(x);});
+      g.append(h('button',{class:'bed',type:'button','aria-label':'Bed '+n,onclick:function(){view.bed=n;render();window.scrollTo(0,0);}},
+        h('span',{class:'lbl',text:'Bed'}),h('span',{class:'num',text:n}),
+        on.length?h('ul',null,on.slice(0,3).map(function(p){return h('li',{text:p.plant});}),on.length>3?h('li',{class:'none',text:'+'+(on.length-3)+' more'}):null):h('span',{class:'none',text:'Nothing growing'}),
+        shots.length?h('div',{class:'thumbs'},shots.map(function(x){return photo(x);})):null));
+    });
+    g.append(h('button',{class:'bed add',type:'button',text:'+ Add bed',onclick:openNewBed}));
+    out.append(g);
+    return out;
+  }
+  function viewBed(){
+    var n=view.bed, ps=plantsIn(n), out=h('div');
+    out.append(h('button',{class:'back',type:'button',text:'‹ All beds',onclick:function(){view.bed=null;render();}}));
+    out.append(h('div',{class:'bar'},h('h2',{text:'Bed '+n}),h('button',{class:'btn small',type:'button',text:'Add here',onclick:function(){openPlanting(null,n);}})));
+    if(!ps.length) out.append(h('div',{class:'empty'},h('strong',{text:'Empty bed'}),'Nothing logged in this bed yet.'));
+    var on=ps.filter(isActive), past=ps.filter(function(p){return !isActive(p);});
+    on.forEach(function(p){out.append(plantRow(p,false));});
+    if(past.length){out.append(h('h3',{text:'Past plantings'}));past.forEach(function(p){out.append(plantRow(p,false));});}
+    return out;
+  }
+  function viewPlanting(){
+    var p=plantings.find(function(x){return x.id===view.pid;});
+    var out=h('div');
+    out.append(h('button',{class:'back',type:'button',text:'‹ Back',onclick:function(){view.pid=null;render();}}));
+    if(!p||p.deleted_at){out.append(h('div',{class:'empty'},h('strong',{text:'Not found'}),'This planting was deleted or moved.'));return out;}
+    out.append(h('div',{class:'bar'},h('div',null,h('span',{class:'tag',text:'Bed '+p.bed}),statusPill(p.status),p.is_lesson?h('span',{class:'pill lesson',text:'Lesson'}):null)));
+    out.append(h('h2',{text:p.plant+(p.variety?' · '+p.variety:'')}));
+    out.append(h('div',{class:'bar',style:'margin-top:12px'},
+      h('button',{class:'btn',type:'button',text:'+ Add check-in',onclick:function(){openCheckin(p);}}),
+      h('button',{class:'btn alt',type:'button',text:'Edit',onclick:function(){openPlanting(p);}})));
+    var pics=allPhotos(p);
+    if(pics.length) out.append(h('div',{class:'strip'},pics.map(function(x){return photo(x.path,null,x.kind+' photo');})));
+    var g=germ(p), facts=h('dl',{class:'facts'});
+    function fact(k,v){if(v){facts.append(h('dt',{text:k}),h('dd',{text:v}));}}
+    fact('Started',fmtDate(p.date_started));
+    fact('Logged by',p.logged_by);
+    fact('Source',[p.source,p.source_type].filter(Boolean).join(' · '));
+    fact('Packed for',p.packed_year?String(p.packed_year):'');
+    fact('Germination',p.sown?(p.sprouted==null?p.sown+' sown':p.sprouted+' of '+p.sown+' sprouted'+(g!=null?' ('+g+'%)':'')):'');
+    fact('Outcome',p.outcome?(p.outcome+(p.outcome_note?': '+p.outcome_note:'')):'');
+    fact('Notes',p.note);
+    if(facts.childNodes.length) out.append(h('div',{class:'card'},facts));
+    out.append(h('h3',{text:'History'}));
+    var tl=h('ul',{class:'timeline'});
+    checksFor(p.id).forEach(function(c){
+      tl.append(h('li',null,h('button',{class:'tl',type:'button',onclick:function(){openCheckin(p,c);}},
+        h('div',{class:'when'},fmtDate(c.date),c.logged_by?h('span',{class:'meta',text:' · '+c.logged_by}):null),
+        (c.actions&&c.actions.length)||c.is_lesson?h('div',{class:'chips',style:'margin:6px 0 0'},c.is_lesson?h('span',{class:'pill lesson',text:'Lesson'}):null,(c.actions||[]).map(function(a){return h('span',{class:'pill',text:a});})):null,
+        c.note?h('p',{text:c.note}):null,
+        c.photos&&c.photos.length?h('div',{class:'thumbs',style:'margin-top:8px'},c.photos.map(function(x){return photo(x.path);})):null)));
+    });
+    tl.append(h('li',{class:'start'},h('div',{class:'tl'},h('div',{class:'when'},'Started '+(fmtDate(p.date_started)||fmtDate(p.created_at))),h('div',{class:'meta',text:'Logged as '+(p.source_type||'a new planting')+(p.logged_by?' by '+p.logged_by:'')}))));
+    out.append(tl);
+    return out;
+  }
+  function viewPlants(){
+    var out=h('div'), list=h('div');
+    if(view.trash) return viewTrash();
+    function draw(){
+      list.replaceChildren();
+      var q=view.q.trim().toLowerCase();
+      if(view.filter==='Lessons'){
+        var items=[];
+        live().forEach(function(p){if(p.is_lesson) items.push({p:p,date:p.date_started||String(p.created_at).slice(0,10),text:p.note||p.outcome_note||'',who:p.updated_by||p.logged_by});});
+        liveChecks().forEach(function(c){
+          var p=plantings.find(function(x){return x.id===c.planting_id;});
+          if(c.is_lesson&&p&&!p.deleted_at) items.push({p:p,date:c.date,text:c.note||'',who:c.logged_by});
+        });
+        items=items.filter(function(i){return !q||(i.p.plant+' '+i.p.bed+' '+i.text).toLowerCase().indexOf(q)>-1;}).sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+        if(!items.length) list.append(h('div',{class:'empty'},h('strong',{text:'No lessons yet'}),'Tick "lesson learned" on a note or check-in and it shows up here.'));
+        items.forEach(function(i){
+          list.append(h('button',{class:'card src',type:'button',onclick:function(){view.pid=i.p.id;render();window.scrollTo(0,0);}},
+            h('div',{class:'name'},h('span',{class:'tag',text:'Bed '+i.p.bed}),i.p.plant),
+            h('p',{style:'margin:6px 0;white-space:pre-wrap',text:i.text||'(no note)'}),
+            h('div',{class:'meta',text:fmtDate(i.date)+(i.who?' · '+i.who:'')})));
+        });
+        resolvePhotos(); return;
+      }
+      var ps=live().filter(function(p){
+        if(view.filter==='Active'&&!isActive(p)) return false;
+        return !q||(p.plant+' '+(p.variety||'')+' '+p.bed+' '+(p.source||'')).toLowerCase().indexOf(q)>-1;
+      }).sort(function(a,b){return String(b.created_at).localeCompare(String(a.created_at));});
+      if(!ps.length) list.append(h('div',{class:'empty'},h('strong',{text:'Nothing to show'}),plantings.length?'Try a different search or filter.':'Add your first photos to start the log.'));
+      ps.forEach(function(p){list.append(plantRow(p,true));});
+      resolvePhotos();
+    }
+    var search=h('input',{class:'search',type:'search','aria-label':'Search plants',placeholder:'Search plant, bed or source',value:view.q,oninput:function(){view.q=search.value;draw();}});
+    var chips=h('div',{class:'chips'},['Active','All','Lessons'].map(function(f){
+      return h('button',{class:'chip',type:'button','aria-pressed':String(view.filter===f),text:f,onclick:function(){view.filter=f;render();}});
+    }));
+    var trashN=plantings.filter(function(p){return p.deleted_at;}).length+checkins.filter(function(c){return c.deleted_at;}).length;
+    out.append(search,chips,list);
+    if(trashN) out.append(h('button',{class:'link',type:'button',text:'Trash ('+trashN+')',onclick:function(){view.trash=true;render();}}));
+    draw();
+    return out;
+  }
+  function viewTrash(){
+    var out=h('div');
+    out.append(h('button',{class:'back',type:'button',text:'‹ Plants',onclick:function(){view.trash=false;render();}}));
+    out.append(h('h2',{text:'Trash'}),h('p',{class:'summary',text:'Deleted entries stay here. Restore puts them back.'}));
+    async function restore(table,id){
+      var r=await sb.from(table).update({deleted_at:null}).eq('id',id);
+      if(r.error){toast('Could not restore: '+errText(r.error));return;}
+      toast('Restored'); refresh();
+    }
+    var dp=plantings.filter(function(p){return p.deleted_at;}), dc=checkins.filter(function(c){return c.deleted_at;});
+    if(!dp.length&&!dc.length) out.append(h('div',{class:'empty'},h('strong',{text:'Trash is empty'})));
+    dp.forEach(function(p){out.append(h('div',{class:'card bar',style:'margin:0 0 10px'},h('div',null,h('div',{class:'name'},h('span',{class:'tag',text:'Bed '+p.bed}),p.plant),h('div',{class:'meta',text:'Planting · deleted '+fmtDate(p.deleted_at)})),h('button',{class:'btn small',type:'button',text:'Restore',onclick:function(){restore('plantings',p.id);}})));});
+    dc.forEach(function(c){var p=plantings.find(function(x){return x.id===c.planting_id;})||{plant:'Unknown',bed:'?'};out.append(h('div',{class:'card bar',style:'margin:0 0 10px'},h('div',null,h('div',{class:'name',text:'Check-in: '+p.plant+' (Bed '+p.bed+')'}),h('div',{class:'meta',text:fmtDate(c.date)+(c.note?' · '+c.note.slice(0,60):'')})),h('button',{class:'btn small',type:'button',text:'Restore',onclick:function(){restore('checkins',c.id);}})));});
+    return out;
+  }
+  function viewSources(){
+    var out=h('div'), groups={};
+    live().forEach(function(p){var k=p.source||'No source recorded'; (groups[k]=groups[k]||[]).push(p);});
+    var keys=Object.keys(groups).sort(function(a,b){return groups[b].length-groups[a].length||a.localeCompare(b);});
+    out.append(h('p',{class:'summary',text:'Which seeds and suppliers do well in your beds. Germination is sprouted ÷ sown, across every planting with both numbers.'}));
+    if(!keys.length){out.append(h('div',{class:'empty'},h('strong',{text:'No sources yet'}),'Add a source (brand, nursery or person) when you log a planting.'));return out;}
+    keys.forEach(function(k){
+      var ps=groups[k], sown=0, spr=0, oc={};
+      ps.forEach(function(p){if(p.sown>0&&p.sprouted!=null){sown+=p.sown;spr+=p.sprouted;} if(p.outcome) oc[p.outcome]=(oc[p.outcome]||0)+1;});
+      var rated=OUTCOMES.reduce(function(s,o){return s+(oc[o]||0);},0);
+      var open=view.src===k;
+      var card=h('div',{class:'card'});
+      card.append(h('button',{class:'src',type:'button',style:'border:0;background:none;padding:0','aria-expanded':String(open),onclick:function(){view.src=open?null:k;render();}},
+        h('div',{class:'bar',style:'margin:0'},h('span',{class:'name',text:k}),h('span',{class:'meta',text:ps.length+' planting'+(ps.length>1?'s':'')})),
+        h('div',{class:'meta'},sown?('Germination '+Math.round(100*spr/sown)+'% ('+spr+' of '+sown+')'):'No germination counts yet',
+          rated?(' · '+OUTCOMES.filter(function(o){return oc[o];}).map(function(o){return oc[o]+' '+o.toLowerCase();}).join(', ')):''),
+        rated?h('div',{class:'bars','aria-hidden':'true'},OUTCOMES.map(function(o){return oc[o]?h('span',{class:'o-'+o.split(' ')[0],style:'width:'+(100*oc[o]/rated)+'%'}):null;})):null));
+      if(open){card.append(h('div',{style:'margin-top:10px'},ps.map(function(p){return plantRow(p,true);})));}
+      out.append(card);
+    });
+    return out;
+  }
+  function render(){
+    app.replaceChildren();
+    var head=h('header',null,h('div',null,h('div',{class:'eyebrow',text:'Edible Healing Garden'}),h('h1',{text:'Bed log'})));
+    if(phase==='ready') head.append(h('button',{class:'btn alt small',type:'button',text:'Refresh',onclick:function(){refresh().then(function(){toast('Up to date');});}}));
+    app.append(head);
+    if(phase==='loading'){app.append(h('div',{class:'note',text:'Connecting…'}));return;}
+    if(phase==='error'){app.append(h('div',{class:'note'},h('strong',{text:'Could not connect. '}),errMsg,' ',h('button',{class:'link',type:'button',text:'Try again',onclick:boot})));return;}
+    if(phase==='gate'){app.append(gate());return;}
+    var tabs=h('div',{class:'tabs',role:'tablist'},[['beds','Beds'],['plants','Plants'],['sources','Seeds']].map(function(t){
+      return h('button',{type:'button',role:'tab','aria-selected':String(view.tab===t[0]),text:t[1],onclick:function(){view.tab=t[0];view.bed=null;view.pid=null;view.trash=false;render();}});
+    }));
+    app.append(tabs);
+    var body;
+    if(view.pid) body=viewPlanting();
+    else if(view.tab==='plants') body=viewPlants();
+    else if(view.tab==='sources') body=viewSources();
+    else body=view.bed?viewBed():viewBeds();
+    app.append(body);
+    if(!view.pid) app.append(h('button',{class:'fab',type:'button',text:'+ Add photos',onclick:function(){openPlanting(null,view.bed||'');}}));
+    resolvePhotos();
+  }
+  function gate(){
+    var inp=h('input',{id:'word',type:'password',autocomplete:'off',autocapitalize:'none','aria-label':'Team word',placeholder:'Team word'});
+    var btn=h('button',{class:'btn',type:'button',text:'Come in'});
+    async function go(){
+      var w=inp.value.trim(); if(!w){inp.focus();return;}
+      btn.disabled=true; btn.textContent='Checking…';
+      var r=await sb.rpc('join_team',{word:w});
+      if(r.error){toast('Could not check the word: '+errText(r.error));btn.disabled=false;btn.textContent='Come in';return;}
+      if(r.data!==true){toast('That is not the team word. Try again.');inp.value='';inp.focus();btn.disabled=false;btn.textContent='Come in';return;}
+      phase='loading'; render(); await load(); phase='ready'; render();
+    }
+    btn.addEventListener('click',go);
+    inp.addEventListener('keydown',function(e){if(e.key==='Enter') go();});
+    setTimeout(function(){inp.focus();},50);
+    return h('div',{class:'gate'},h('h2',{text:'What’s the team word?'}),h('p',{text:'Ask Katherine if you don’t know it. You only need to enter it once on this phone.'}),inp,btn);
+  }
+
+  /* ---------- data ---------- */
+  async function load(){
+    var res=await Promise.all([
+      sb.from('plantings').select('*').order('created_at',{ascending:false}),
+      sb.from('checkins').select('*').order('date',{ascending:false}),
+      sb.from('beds').select('*')
+    ]);
+    res.forEach(function(r){if(r.error) throw r.error;});
+    plantings=res[0].data||[]; checkins=res[1].data||[]; beds=res[2].data||[];
+  }
+  async function boot(){
+    phase='loading'; render();
+    try{
+      if(!window.supabase||!window.supabase.createClient) throw new Error('The app could not load. Check your internet connection.');
+      sb=sb||window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'garden-log-auth'}});
+      var s=await sb.auth.getSession();
+      if(!s.data.session){
+        var a=await sb.auth.signInAnonymously();
+        if(a.error) throw new Error('Sign-in failed ('+errText(a.error)+'). Anonymous sign-ins may be turned off in Supabase.');
+      }
+      var m=await sb.rpc('is_member');
+      if(m.error) throw new Error(errText(m.error)+'. The database setup may not have run yet.');
+      if(m.data!==true){phase='gate';render();return;}
+      await load(); phase='ready'; render();
+    }catch(e){phase='error'; errMsg=errText(e); render();}
+  }
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible'&&phase==='ready'&&!document.querySelector('.scrim')) refresh().catch(function(){});
+  });
+  boot();
+})();
+</script>
+</body>
+</html>
