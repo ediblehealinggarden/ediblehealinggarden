@@ -122,7 +122,9 @@ legend{font:700 15px var(--display);padding:0 6px}
 .picks .btn{flex:1}
 .lightbox{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:12px}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain}
-.toast{position:fixed;left:50%;top:max(16px,env(safe-area-inset-top));transform:translateX(-50%);z-index:50;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;max-width:90%;font-weight:500}
+.trash-ph{flex:none;width:56px;height:56px;object-fit:cover;border-radius:8px;background:var(--soft)}
+.toast .undo{border:0;background:var(--sun);color:var(--sun-ink);font-weight:700;border-radius:8px;padding:6px 12px;margin-left:12px}
+.toast{position:fixed;display:flex;width:max-content;align-items:center;left:50%;top:max(16px,env(safe-area-inset-top));transform:translateX(-50%);z-index:50;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;max-width:90%;font-weight:500}
 .note{background:var(--soft);border-radius:12px;padding:12px 14px;margin:0 0 14px}
 .actions{display:flex;gap:8px;justify-content:space-between;margin-top:6px}
 .gate{max-width:380px;margin:40px auto 0;text-align:center}
@@ -177,13 +179,37 @@ legend{font:700 15px var(--display);padding:0 6px}
     if(window.crypto&&crypto.randomUUID) return crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);});
   }
+  function localDay(ts){if(!ts) return ''; var d=new Date(ts); return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-  function fmtDate(s){if(!s) return ''; var d=new Date(String(s).slice(0,10)+'T00:00:00'); return isNaN(d)?'':d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
+  function fmtDate(s){if(!s) return ''; s=String(s); var d=s.length>10?new Date(s):new Date(s.slice(0,10)+'T00:00:00'); return isNaN(d)?'':d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}
   function clean(s){s=(s==null?'':String(s)).trim(); return s||null;}
   function num(s){if(s==null||String(s).trim()==='') return null; var n=parseInt(s,10); return isNaN(n)?null:n;}
   function savedName(){try{return localStorage.getItem('garden-name')||'';}catch(e){return '';}}
   function saveName(n){try{localStorage.setItem('garden-name',n);}catch(e){}}
-  function toast(msg){document.querySelectorAll('.toast').forEach(function(x){x.remove();});var t=h('div',{class:'toast',role:'status',text:msg});document.body.append(t);setTimeout(function(){t.remove();},3800);}
+  var toastTimer=null;
+  function toast(msg,undo){
+    document.querySelectorAll('.toast').forEach(function(x){x.remove();}); clearTimeout(toastTimer);
+    var t=h('div',{class:'toast',role:'status'},h('span',{text:msg}));
+    if(undo) t.append(h('button',{class:'undo',type:'button',text:'Undo',onclick:async function(){
+      t.remove(); clearTimeout(toastTimer);
+      try{await undo(); await refresh(); toast('Undone');}catch(e){toast('Could not undo: '+errText(e));}
+    }}));
+    document.body.append(t); toastTimer=setTimeout(function(){t.remove();},undo?10000:3800);
+  }
+  function pick(row,keys){var o={};keys.forEach(function(k){var v=row[k]===undefined?null:row[k]; if(v==null&&(k==='photos'||k==='removed_photos'||k==='actions')) v=[]; if(v==null&&k==='is_lesson') v=false; o[k]=v;});return o;}
+  async function revertRows(table,rows,keys){
+    for(var i=0;i<rows.length;i++){var r=await sb.from(table).update(pick(rows[i],keys)).eq('id',rows[i].id); if(r.error) throw r.error;}
+  }
+  async function hardDelete(table,ids){
+    if(!ids.length) return; var r=await sb.from(table).delete().in('id',ids); if(r.error) throw r.error;
+  }
+  function removedFrom(before,after,name){
+    var keep={}; after.forEach(function(x){keep[x.path]=1;});
+    return (before||[]).filter(function(x){return !keep[x.path];}).map(function(x){return {path:x.path,kind:x.kind,removed_at:new Date().toISOString(),removed_by:name};});
+  }
+  var PLANT_KEYS=['bed','plant','variety','date_started','status','source','source_type','packed_year','sown','sprouted','outcome','outcome_note','note','is_lesson','photos','removed_photos','updated_by','updated_at','group_id','deleted_at'];
+  var CHECK_KEYS=['date','actions','note','is_lesson','photos','removed_photos','logged_by','deleted_at'];
+  var SHARED_KEYS=['plant','variety','source','source_type','packed_year','date_started','sown','sprouted'];
   function errText(e){return (e&&(e.message||e.error_description))||String(e);}
   function uniq(arr){var s={};arr.forEach(function(v){if(v) s[String(v).trim()]=1;});return Object.keys(s).filter(Boolean).sort(function(a,b){return a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'});});}
   function live(){return plantings.filter(function(p){return !p.deleted_at;});}
@@ -284,25 +310,33 @@ legend{font:700 15px var(--display);padding:0 6px}
   }
 
   /* ---------- overlays ---------- */
-  function sheet(title,build){
-    var scrim=h('div',{class:'scrim'});
-    function close(){scrim.remove();if(!document.querySelector('.scrim')) document.body.classList.remove('lock');}
+  function sheet(title,build,onClose){
+    var scrim=h('div',{class:'scrim'}), dirty=false, closed=false;
+    function close(){if(closed) return; closed=true; scrim.remove();if(!document.querySelector('.scrim')) document.body.classList.remove('lock'); if(onClose) onClose();}
+    async function tryClose(){
+      if(dirty&&!(await ask('Discard changes?','What you entered here has not been saved.','Discard'))) return;
+      close();
+    }
     var box=h('div',{class:'sheet',role:'dialog','aria-modal':'true','aria-label':title},
-      h('div',{class:'sheet-head'},h('h2',{text:title}),h('button',{class:'icon',type:'button','aria-label':'Close',text:'×',onclick:close})));
+      h('div',{class:'sheet-head'},h('h2',{text:title}),h('button',{class:'icon',type:'button','aria-label':'Close',text:'×',onclick:tryClose})));
     box.append(build(close)); scrim.append(box);
-    scrim.addEventListener('click',function(e){if(e.target===scrim) close();});
+    box.addEventListener('input',function(){dirty=true;});
+    box.addEventListener('change',function(){dirty=true;});
+    box.addEventListener('click',function(e){if(e.target.closest('.chip,.tile .x')) dirty=true;});
+    scrim.addEventListener('click',function(e){if(e.target===scrim) tryClose();});
     document.body.append(scrim); document.body.classList.add('lock');
     return close;
   }
   function lightbox(url){var lb=h('div',{class:'lightbox',role:'dialog','aria-label':'Photo',onclick:function(){lb.remove();}},h('img',{src:url,alt:'Enlarged photo'}));document.body.append(lb);}
   function ask(title,msg,ok){
     return new Promise(function(resolve){
+      var done=false;
       sheet(title,function(close){
-        var done=false; function fin(v){if(done) return; done=true; close(); resolve(v);}
+        function fin(v){if(done) return; done=true; close(); resolve(v);}
         return h('div',null,h('p',{text:msg}),h('div',{class:'actions'},
           h('button',{class:'btn alt',type:'button',text:'Cancel',onclick:function(){fin(false);}}),
           h('button',{class:'btn danger',type:'button',text:ok,onclick:function(){fin(true);}})));
-      });
+      },function(){if(!done){done=true;resolve(false);}});
     });
   }
   function whoField(id,label){
@@ -319,17 +353,43 @@ legend{font:700 15px var(--display);padding:0 6px}
   async function refresh(){await load(); render();}
   function saving(btn,on){btn.disabled=on; btn.textContent=on?'Saving…':'Save';}
 
+  function bedPicker(id,multi,initial,hint){
+    var sel=initial.slice();
+    var inp=h('input',{id:id,type:'text',placeholder:multi?'Or type a new bed':'Type a bed number or name',autocomplete:'off'});
+    if(!multi) inp.value=initial[0]||'';
+    var box=h('div',{class:'chips'});
+    function paint(){
+      box.replaceChildren();
+      bedNames().forEach(function(n){
+        var on=multi?sel.indexOf(n)>-1:inp.value.trim()===n;
+        box.append(h('button',{class:'chip',type:'button','aria-pressed':String(on),text:n,onclick:function(){
+          if(multi){var i=sel.indexOf(n); if(i>-1) sel.splice(i,1); else sel.push(n);} else inp.value=n;
+          paint();
+        }}));
+      });
+    }
+    inp.addEventListener('input',paint); paint();
+    return {
+      el:h('div',{class:'field'},h('label',{for:id,text:multi?'Bed (tap every bed it went into)':'Bed'}),box,inp,hint?h('span',{class:'meta',text:hint}):null),
+      values:function(){
+        if(!multi){var v=inp.value.trim(); return v?[v]:[];}
+        var out=sel.slice(); inp.value.split(',').forEach(function(x){x=x.trim(); if(x&&out.indexOf(x)<0) out.push(x);}); return out;
+      }
+    };
+  }
+  async function ensureBeds(list){
+    var r=await sb.from('beds').upsert(list.map(function(b){return {name:b};}),{onConflict:'name',ignoreDuplicates:true});
+    if(r.error) throw r.error;
+  }
+
   /* ---------- planting editor ---------- */
   function openPlanting(p,presetBed){
     var isNew=!p; p=p||{};
     sheet(isNew?'Add to the garden':'Edit planting',function(close){
       var pics=photoPicker(p.photos,['Tray','Seed packet']);
       var who=whoField('f-who',isNew?'Logged by':'Edited by');
-      var bedVal=p.bed||presetBed||'';
-      var bedInp=h('input',{id:'f-bed',type:'text',value:bedVal,placeholder:'Type a bed number or name',autocomplete:'off'});
-      var chipBox=h('div',{class:'chips'});
-      function paint(){chipBox.replaceChildren();bedNames().forEach(function(n){chipBox.append(h('button',{class:'chip',type:'button','aria-pressed':String(bedInp.value.trim()===n),text:n,onclick:function(){bedInp.value=n;paint();}}));});}
-      bedInp.addEventListener('input',paint); paint();
+      var startBed=p.bed||presetBed||'';
+      var bp=bedPicker('f-bed',isNew,startBed?[startBed]:[],isNew?'Planted the same thing in several beds? Tap each one. You get a linked entry per bed.':null);
       var plant=h('input',{id:'f-plant',type:'text',value:p.plant||'',placeholder:'e.g. Cherokee Purple tomato',list:'f-plant-list',autocomplete:'off'});
       var variety=h('input',{id:'f-var',type:'text',value:p.variety||'',placeholder:'Optional'});
       var date=h('input',{id:'f-date',type:'date',value:p.date_started||today()});
@@ -346,28 +406,48 @@ legend{font:700 15px var(--display);padding:0 6px}
       status.addEventListener('change',showOut); showOut();
       var note=h('textarea',{id:'f-note',rows:3,placeholder:'Spacing, conditions, anything to remember'}); note.value=p.note||'';
       var lesson=h('input',{id:'f-lesson',type:'checkbox',checked:!!p.is_lesson});
+      var sibs=(!isNew&&p.group_id)?live().filter(function(x){return x.group_id===p.group_id&&x.id!==p.id;}):[];
+      var linked=h('input',{id:'f-linked',type:'checkbox',checked:true});
+      var linkedBox=sibs.length?h('label',{class:'check',for:'f-linked'},linked,'Also update the plant, variety, source and germination in Bed'+(sibs.length>1?'s ':' ')+sibs.map(function(x){return x.bed;}).join(', ')):null;
 
       var save=h('button',{class:'btn',type:'button',text:'Save'});
       save.addEventListener('click',async function(){
-        var name=who.inp.value.trim(), bed=bedInp.value.trim(), pl=plant.value.trim();
+        var name=who.inp.value.trim(), bedList=bp.values(), pl=plant.value.trim();
         if(!name){toast('Add your name so the team knows who logged this.');return;}
-        if(!bed){toast('Choose a bed or type one.');return;}
+        if(!bedList.length){toast('Choose a bed or type one.');return;}
         if(!pl){toast('Add the plant name.');return;}
         saving(save,true);
         try{
           var photos=await uploadAll(pics.list);
           var done=DONE.indexOf(status.value)>-1;
-          var data={bed:bed,plant:pl,variety:clean(variety.value),date_started:date.value||null,status:status.value,
+          var data={bed:bedList[0],plant:pl,variety:clean(variety.value),date_started:date.value||null,status:status.value,
             source:clean(source.value),source_type:clean(stype.value),packed_year:num(year.value),sown:num(sown.value),sprouted:num(sprouted.value),
             outcome:done?clean(outcome.value):(p.outcome||null),outcome_note:done?clean(outNote.value):(p.outcome_note||null),
             note:clean(note.value),is_lesson:lesson.checked,photos:photos,updated_by:name,updated_at:new Date().toISOString()};
-          var r=await sb.from('beds').upsert({name:bed},{onConflict:'name',ignoreDuplicates:true});
-          if(r.error) throw r.error;
-          if(isNew){data.id=uuid(); data.logged_by=name; r=await sb.from('plantings').insert(data);}
-          else r=await sb.from('plantings').update(data).eq('id',p.id);
-          if(r.error) throw r.error;
-          saveName(name); close(); toast(isNew?'Saved to Bed '+bed:'Changes saved');
-          if(isNew){view.tab='beds';view.bed=bed;view.pid=null;}
+          await ensureBeds(bedList);
+          var r, undo;
+          if(isNew){
+            var g=bedList.length>1?uuid():null;
+            var rows=bedList.map(function(b){return Object.assign({},data,{id:uuid(),bed:b,logged_by:name,group_id:g});});
+            r=await sb.from('plantings').insert(rows);
+            if(r.error) throw r.error;
+            undo=function(){return hardDelete('plantings',rows.map(function(x){return x.id;}));};
+          } else {
+            var before=[Object.assign({},p)];
+            data.removed_photos=(p.removed_photos||[]).concat(removedFrom(p.photos,photos,name));
+            r=await sb.from('plantings').update(data).eq('id',p.id);
+            if(r.error) throw r.error;
+            if(sibs.length&&linked.checked){
+              var shared=pick(data,SHARED_KEYS); shared.updated_by=name; shared.updated_at=data.updated_at;
+              for(var i=0;i<sibs.length;i++){
+                before.push(Object.assign({},sibs[i]));
+                r=await sb.from('plantings').update(shared).eq('id',sibs[i].id); if(r.error) throw r.error;
+              }
+            }
+            undo=function(){return revertRows('plantings',before,PLANT_KEYS);};
+          }
+          saveName(name); close(); toast(isNew?'Saved to Bed'+(bedList.length>1?'s ':' ')+bedList.join(', '):'Changes saved',undo);
+          if(isNew){view.tab='beds';view.bed=bedList.length===1?bedList[0]:null;view.pid=null;}
           await refresh();
         }catch(e){toast('Could not save: '+errText(e));saving(save,false);}
       });
@@ -376,14 +456,15 @@ legend{font:700 15px var(--display);padding:0 6px}
         if(!(await ask('Delete this planting?','This moves '+p.plant+' (Bed '+p.bed+') and its check-ins to the trash. You can restore it from the Plants tab.','Move to trash'))) return;
         var r=await sb.from('plantings').update({deleted_at:new Date().toISOString(),updated_by:who.inp.value.trim()||null}).eq('id',p.id);
         if(r.error){toast('Could not delete: '+errText(r.error));return;}
-        close(); view.pid=null; toast('Moved to trash'); refresh();
+        close(); view.pid=null; await refresh();
+        toast('Moved to trash',async function(){var x=await sb.from('plantings').update({deleted_at:null}).eq('id',p.id); if(x.error) throw x.error; view.pid=p.id;});
       }}));
       else actions.append(h('span'));
       actions.append(save);
 
       return h('div',null,
         pics.el, who.el,
-        h('div',{class:'field'},h('label',{for:'f-bed',text:'Bed'}),chipBox,bedInp),
+        bp.el,
         field('f-plant','Plant',plant,datalist('f-plant-list',plantNames())),
         field('f-var','Variety',variety),
         h('div',{class:'two'},field('f-date','Date started',date),field('f-status','Stage',status)),
@@ -395,6 +476,7 @@ legend{font:700 15px var(--display);padding:0 6px}
         outBox,
         field('f-note','Notes',note),
         h('label',{class:'check',for:'f-lesson'},lesson,'Mark these notes as a lesson learned'),
+        linkedBox,
         actions);
     });
   }
@@ -430,17 +512,22 @@ legend{font:700 15px var(--display);padding:0 6px}
         try{
           var photos=await uploadAll(pics.list);
           var data={planting_id:p.id,date:date.value||today(),actions:picked,note:clean(note.value),is_lesson:lesson.checked,photos:photos,logged_by:name};
-          var r;
+          var r, prevPlant=Object.assign({},p), prevCheck=Object.assign({},c);
           if(isNew){data.id=uuid(); r=await sb.from('checkins').insert(data);}
-          else r=await sb.from('checkins').update(data).eq('id',c.id);
+          else{data.removed_photos=(c.removed_photos||[]).concat(removedFrom(c.photos,photos,name)); r=await sb.from('checkins').update(data).eq('id',c.id);}
           if(r.error) throw r.error;
+          var stageChanged=!!stage.value;
+          var undo=async function(){
+            if(isNew) await hardDelete('checkins',[data.id]); else await revertRows('checkins',[prevCheck],CHECK_KEYS);
+            if(stageChanged) await revertRows('plantings',[prevPlant],['status','outcome','outcome_note','updated_by','updated_at']);
+          };
           if(stage.value){
             var up={status:stage.value,updated_by:name,updated_at:new Date().toISOString()};
             if(DONE.indexOf(stage.value)>-1){up.outcome=clean(outcome.value);up.outcome_note=clean(outNote.value);}
             r=await sb.from('plantings').update(up).eq('id',p.id);
             if(r.error) throw r.error;
           }
-          saveName(name); close(); toast('Check-in saved'); await refresh();
+          saveName(name); close(); await refresh(); toast('Check-in saved',undo);
         }catch(e){toast('Could not save: '+errText(e));saving(save,false);}
       });
       var actions=h('div',{class:'actions'});
@@ -448,7 +535,8 @@ legend{font:700 15px var(--display);padding:0 6px}
         if(!(await ask('Delete this check-in?','It moves to the trash. You can restore it from the Plants tab.','Move to trash'))) return;
         var r=await sb.from('checkins').update({deleted_at:new Date().toISOString()}).eq('id',c.id);
         if(r.error){toast('Could not delete: '+errText(r.error));return;}
-        close(); toast('Moved to trash'); refresh();
+        close(); await refresh();
+        toast('Moved to trash',async function(){var x=await sb.from('checkins').update({deleted_at:null}).eq('id',c.id); if(x.error) throw x.error;});
       }}));
       else actions.append(h('span'));
       actions.append(save);
@@ -460,6 +548,82 @@ legend{font:700 15px var(--display);padding:0 6px}
         h('label',{class:'check',for:'c-lesson'},lesson,'Mark as a lesson learned'),
         field('c-stage','Update stage',stage), outBox,
         actions);
+    });
+  }
+
+  function openTransplant(p){
+    sheet('Move to beds',function(close){
+      var who=whoField('t-who','Moved by');
+      var bp=bedPicker('t-bed',true,[],'Pick one bed to move it, or several to split it between them.');
+      var date=h('input',{id:'t-date',type:'date',value:today()});
+      var note=h('textarea',{id:'t-note',rows:2,placeholder:'Optional, e.g. 6 seedlings per bed'});
+      var save=h('button',{class:'btn',type:'button',text:'Save'});
+      save.addEventListener('click',async function(){
+        var name=who.inp.value.trim(), list=bp.values();
+        if(!name){toast('Add your name so the team knows who moved it.');return;}
+        if(!list.length){toast('Pick at least one bed.');return;}
+        saving(save,true);
+        try{
+          var from=p.bed, g=p.group_id||(list.length>1?uuid():null), now=new Date().toISOString(), prev=Object.assign({},p);
+          var stage=p.status==='Seeds started'?'Transplanted':p.status;
+          await ensureBeds(list);
+          var r=await sb.from('plantings').update({bed:list[0],status:stage,group_id:g,updated_by:name,updated_at:now}).eq('id',p.id);
+          if(r.error) throw r.error;
+          var copies=list.slice(1).map(function(b){return {id:uuid(),bed:b,plant:p.plant,variety:p.variety,source:p.source,source_type:p.source_type,packed_year:p.packed_year,
+            date_started:p.date_started,status:stage,sown:p.sown,sprouted:p.sprouted,note:p.note,photos:p.photos||[],logged_by:p.logged_by||name,updated_by:name,group_id:g};});
+          if(copies.length){r=await sb.from('plantings').insert(copies); if(r.error) throw r.error;}
+          var extra=clean(note.value);
+          var moves=[{id:p.id,bed:list[0]}].concat(copies.map(function(c){return {id:c.id,bed:c.bed};}));
+          var autoIds=moves.map(function(){return uuid();});
+          r=await sb.from('checkins').insert(moves.map(function(x,i){return {id:autoIds[i],planting_id:x.id,date:date.value||today(),actions:['Transplanted'],
+            note:(x.bed===from?'Stayed in Bed '+from+'.':'Moved from Bed '+from+' to Bed '+x.bed+'.')+(extra?'\n'+extra:''),photos:[],logged_by:name};}));
+          if(r.error) throw r.error;
+          saveName(name); close(); await refresh();
+          toast('Moved to Bed'+(list.length>1?'s ':' ')+list.join(', '),async function(){
+            await hardDelete('checkins',autoIds);
+            await hardDelete('plantings',copies.map(function(c){return c.id;}));
+            await revertRows('plantings',[prev],['bed','status','group_id','updated_by','updated_at']);
+          });
+        }catch(e){toast('Could not move: '+errText(e));saving(save,false);}
+      });
+      return h('div',null,
+        h('p',{class:'meta',text:'Everything in Bed '+p.bed+' moves. Photos, source and germination carry over to each new bed, and each bed gets its own history from here on.'}),
+        who.el,bp.el,field('t-date','Date',date),field('t-note','Notes',note),h('div',{class:'actions'},h('span'),save));
+    });
+  }
+  function openBedOptions(n){
+    sheet('Bed '+n,function(close){
+      var inp=h('input',{id:'rb',type:'text',value:n,autocomplete:'off'});
+      var count=live().filter(function(p){return p.bed===n;}).length;
+      var ren=h('button',{class:'btn',type:'button',text:'Rename',onclick:async function(){
+        var to=inp.value.trim(); if(!to||to===n){toast('Type the new bed name first.');return;}
+        if(bedNames().indexOf(to)>-1&&!(await ask('Combine beds?','Bed '+to+' already exists. Everything in Bed '+n+' will move into Bed '+to+'.','Combine'))) return;
+        try{
+          var movedIds=plantings.filter(function(p){return p.bed===n;}).map(function(p){return p.id;});
+          var existed=bedNames().indexOf(to)>-1;
+          await ensureBeds([to]);
+          var r=await sb.from('plantings').update({bed:to}).eq('bed',n); if(r.error) throw r.error;
+          r=await sb.from('beds').delete().eq('name',n); if(r.error) throw r.error;
+          close(); view.bed=to; await refresh();
+          toast('Renamed to Bed '+to,async function(){
+            await ensureBeds([n]);
+            for(var i=0;i<movedIds.length;i++){var x=await sb.from('plantings').update({bed:n}).eq('id',movedIds[i]); if(x.error) throw x.error;}
+            if(!existed){var y=await sb.from('beds').delete().eq('name',to); if(y.error) throw y.error;}
+            view.bed=n;
+          });
+        }catch(e){toast('Could not rename: '+errText(e));}
+      }});
+      var del=h('button',{class:'btn danger',type:'button',text:'Delete bed',onclick:async function(){
+        if(count){toast('Move or delete the '+count+' planting'+(count>1?'s':'')+' in this bed first.');return;}
+        if(!(await ask('Delete Bed '+n+'?','The bed is empty, so nothing else is affected.','Delete bed'))) return;
+        var r=await sb.from('beds').delete().eq('name',n);
+        if(r.error){toast('Could not delete: '+errText(r.error));return;}
+        close(); view.bed=null; await refresh();
+        toast('Bed '+n+' deleted',async function(){await ensureBeds([n]);});
+      }});
+      return h('div',null,field('rb','Bed name',inp),
+        h('p',{class:'meta',text:count?'This bed has '+count+' planting'+(count>1?'s':'')+'. Renaming moves them too. To delete the bed, move or delete them first.':'This bed is empty, so you can delete it.'}),
+        h('div',{class:'actions'},del,ren));
     });
   }
 
@@ -508,7 +672,9 @@ legend{font:700 15px var(--display);padding:0 6px}
   function viewBed(){
     var n=view.bed, ps=plantsIn(n), out=h('div');
     out.append(h('button',{class:'back',type:'button',text:'‹ All beds',onclick:function(){view.bed=null;render();}}));
-    out.append(h('div',{class:'bar'},h('h2',{text:'Bed '+n}),h('button',{class:'btn small',type:'button',text:'Add here',onclick:function(){openPlanting(null,n);}})));
+    out.append(h('div',{class:'bar'},h('h2',{text:'Bed '+n}),h('div',{style:'display:flex;gap:6px'},
+      h('button',{class:'btn alt small',type:'button',text:'Rename or delete',onclick:function(){openBedOptions(n);}}),
+      h('button',{class:'btn small',type:'button',text:'Add here',onclick:function(){openPlanting(null,n);}}))));
     if(!ps.length) out.append(h('div',{class:'empty'},h('strong',{text:'Empty bed'}),'Nothing logged in this bed yet.'));
     var on=ps.filter(isActive), past=ps.filter(function(p){return !isActive(p);});
     on.forEach(function(p){out.append(plantRow(p,false));});
@@ -524,7 +690,12 @@ legend{font:700 15px var(--display);padding:0 6px}
     out.append(h('h2',{text:p.plant+(p.variety?' · '+p.variety:'')}));
     out.append(h('div',{class:'bar',style:'margin-top:12px'},
       h('button',{class:'btn',type:'button',text:'+ Add check-in',onclick:function(){openCheckin(p);}}),
-      h('button',{class:'btn alt',type:'button',text:'Edit',onclick:function(){openPlanting(p);}})));
+      h('div',{style:'display:flex;gap:8px'},
+        h('button',{class:'btn alt',type:'button',text:'Move to beds',onclick:function(){openTransplant(p);}}),
+        h('button',{class:'btn alt',type:'button',text:'Edit',onclick:function(){openPlanting(p);}}))));
+    var sibs=p.group_id?live().filter(function(x){return x.group_id===p.group_id&&x.id!==p.id;}):[];
+    if(sibs.length) out.append(h('div',{class:'chips'},h('span',{class:'meta',style:'align-self:center',text:'Also in'}),
+      sibs.map(function(x){return h('button',{class:'chip',type:'button',text:'Bed '+x.bed,onclick:function(){view.pid=x.id;render();window.scrollTo(0,0);}});})));
     var pics=allPhotos(p);
     if(pics.length) out.append(h('div',{class:'strip'},pics.map(function(x){return photo(x.path,null,x.kind+' photo');})));
     var g=germ(p), facts=h('dl',{class:'facts'});
@@ -585,7 +756,8 @@ legend{font:700 15px var(--display);padding:0 6px}
     var chips=h('div',{class:'chips'},['Active','All','Lessons'].map(function(f){
       return h('button',{class:'chip',type:'button','aria-pressed':String(view.filter===f),text:f,onclick:function(){view.filter=f;render();}});
     }));
-    var trashN=plantings.filter(function(p){return p.deleted_at;}).length+checkins.filter(function(c){return c.deleted_at;}).length;
+    var trashN=plantings.filter(function(p){return p.deleted_at;}).length+checkins.filter(function(c){return c.deleted_at;}).length
+      +plantings.concat(checkins).reduce(function(n,x){return n+(x.removed_photos||[]).length;},0);
     out.append(search,chips,list);
     if(trashN) out.append(h('button',{class:'link',type:'button',text:'Trash ('+trashN+')',onclick:function(){view.trash=true;render();}}));
     draw();
@@ -601,7 +773,25 @@ legend{font:700 15px var(--display);padding:0 6px}
       toast('Restored'); refresh();
     }
     var dp=plantings.filter(function(p){return p.deleted_at;}), dc=checkins.filter(function(c){return c.deleted_at;});
-    if(!dp.length&&!dc.length) out.append(h('div',{class:'empty'},h('strong',{text:'Trash is empty'})));
+    var rp=[];
+    plantings.forEach(function(p){(p.removed_photos||[]).forEach(function(x){rp.push({table:'plantings',row:p,photo:x,label:p.plant+' (Bed '+p.bed+')'});});});
+    checkins.forEach(function(c){var p=plantings.find(function(x){return x.id===c.planting_id;})||{plant:'Unknown',bed:'?'};(c.removed_photos||[]).forEach(function(x){rp.push({table:'checkins',row:c,photo:x,label:'Check-in: '+p.plant+' (Bed '+p.bed+')'});});});
+    if(!dp.length&&!dc.length&&!rp.length) out.append(h('div',{class:'empty'},h('strong',{text:'Trash is empty'})));
+    async function restorePhoto(item){
+      var row=item.row, keep=(row.removed_photos||[]).filter(function(x){return x.path!==item.photo.path;});
+      var back=(row.photos||[]).concat([{path:item.photo.path,kind:item.photo.kind||'Other'}]);
+      var r=await sb.from(item.table).update({photos:back,removed_photos:keep}).eq('id',row.id);
+      if(r.error){toast('Could not restore: '+errText(r.error));return;}
+      toast('Photo restored'); refresh();
+    }
+    if(rp.length){
+      out.append(h('h3',{text:'Removed photos'}));
+      rp.forEach(function(item){out.append(h('div',{class:'card bar',style:'margin:0 0 10px;flex-wrap:nowrap'},
+        photo(item.photo.path,'trash-ph','Removed photo'),
+        h('div',{style:'flex:1;min-width:0'},h('div',{class:'name',text:item.label}),h('div',{class:'meta',text:'Removed '+fmtDate(item.photo.removed_at)+(item.photo.removed_by?' by '+item.photo.removed_by:'')})),
+        h('button',{class:'btn small',type:'button',text:'Restore',onclick:function(){restorePhoto(item);}})));});
+      if(dp.length||dc.length) out.append(h('h3',{text:'Deleted entries'}));
+    }
     dp.forEach(function(p){out.append(h('div',{class:'card bar',style:'margin:0 0 10px'},h('div',null,h('div',{class:'name'},h('span',{class:'tag',text:'Bed '+p.bed}),p.plant),h('div',{class:'meta',text:'Planting · deleted '+fmtDate(p.deleted_at)})),h('button',{class:'btn small',type:'button',text:'Restore',onclick:function(){restore('plantings',p.id);}})));});
     dc.forEach(function(c){var p=plantings.find(function(x){return x.id===c.planting_id;})||{plant:'Unknown',bed:'?'};out.append(h('div',{class:'card bar',style:'margin:0 0 10px'},h('div',null,h('div',{class:'name',text:'Check-in: '+p.plant+' (Bed '+p.bed+')'}),h('div',{class:'meta',text:fmtDate(c.date)+(c.note?' · '+c.note.slice(0,60):'')})),h('button',{class:'btn small',type:'button',text:'Restore',onclick:function(){restore('checkins',c.id);}})));});
     return out;
@@ -610,11 +800,15 @@ legend{font:700 15px var(--display);padding:0 6px}
     var out=h('div'), groups={};
     live().forEach(function(p){var k=p.source||'No source recorded'; (groups[k]=groups[k]||[]).push(p);});
     var keys=Object.keys(groups).sort(function(a,b){return groups[b].length-groups[a].length||a.localeCompare(b);});
-    out.append(h('p',{class:'summary',text:'Which seeds and suppliers do well in your beds. Germination is sprouted ÷ sown, across every planting with both numbers.'}));
+    out.append(h('p',{class:'summary',text:'Which seeds and suppliers do well in your beds. Germination is sprouted ÷ sown, across every planting with both numbers. A tray split between beds counts once.'}));
     if(!keys.length){out.append(h('div',{class:'empty'},h('strong',{text:'No sources yet'}),'Add a source (brand, nursery or person) when you log a planting.'));return out;}
     keys.forEach(function(k){
       var ps=groups[k], sown=0, spr=0, oc={};
-      ps.forEach(function(p){if(p.sown>0&&p.sprouted!=null){sown+=p.sown;spr+=p.sprouted;} if(p.outcome) oc[p.outcome]=(oc[p.outcome]||0)+1;});
+      var seen={};
+      ps.forEach(function(p){
+        if(p.sown>0&&p.sprouted!=null&&!(p.group_id&&seen[p.group_id])){sown+=p.sown;spr+=p.sprouted;if(p.group_id) seen[p.group_id]=1;}
+        if(p.outcome) oc[p.outcome]=(oc[p.outcome]||0)+1;
+      });
       var rated=OUTCOMES.reduce(function(s,o){return s+(oc[o]||0);},0);
       var open=view.src===k;
       var card=h('div',{class:'card'});
@@ -628,10 +822,58 @@ legend{font:700 15px var(--display);padding:0 6px}
     });
     return out;
   }
+  /* ---------- export ---------- */
+  function csvCell(v){
+    if(v==null) return '';
+    var s=Array.isArray(v)?v.join('; '):String(v);
+    if(/^[=+\-@\t\r]/.test(s)) s="'"+s;
+    return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  }
+  function downloadCsv(name,header,rows){
+    var text='﻿'+[header].concat(rows).map(function(r){return r.map(csvCell).join(',');}).join('\r\n');
+    var url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));
+    var a=h('a',{href:url,download:name}); document.body.append(a); a.click(); a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},10000);
+  }
+  function exportPlantings(){
+    var rows=plantings.slice().sort(function(a,b){return String(a.bed).localeCompare(String(b.bed),undefined,{numeric:true})||String(a.date_started||'').localeCompare(String(b.date_started||''));}).map(function(p){
+      var g=germ(p);
+      return [p.bed,p.plant,p.variety,p.status,p.date_started,p.source,p.source_type,p.packed_year,p.sown,p.sprouted,g==null?'':g+'%',
+        p.outcome,p.outcome_note,p.note,p.is_lesson?'Yes':'',p.logged_by,p.updated_by,(p.photos||[]).length,checksFor(p.id).length,p.group_id?live().filter(function(x){return x.group_id===p.group_id&&x.id!==p.id;}).map(function(x){return x.bed;}).join('; '):'',
+        localDay(p.created_at),localDay(p.deleted_at)];
+    });
+    downloadCsv('garden-log-plantings-'+today()+'.csv',['Bed','Plant','Variety','Stage','Date started','Source','Source type','Packed for year','Seeds sown','Sprouted','Germination','Outcome','Outcome note','Notes','Lesson','Logged by','Last edited by','Photos','Check-ins','Also in beds','Logged on','In trash since'],rows);
+  }
+  function exportCheckins(){
+    var rows=checkins.slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date));}).map(function(c){
+      var p=plantings.find(function(x){return x.id===c.planting_id;})||{};
+      return [c.date,p.bed,p.plant,p.variety,c.logged_by,c.actions||[],c.note,c.is_lesson?'Yes':'',(c.photos||[]).length,localDay(c.deleted_at)];
+    });
+    downloadCsv('garden-log-checkins-'+today()+'.csv',['Date','Bed','Plant','Variety','Checked by','What was done','Notes','Lesson','Photos','In trash since'],rows);
+  }
+  function openExport(){
+    sheet('Export a copy',function(){
+      var status=h('p',{class:'meta',text:'Getting the latest entries…'});
+      var b1=h('button',{class:'btn',type:'button',text:'Download plantings',disabled:true,onclick:exportPlantings});
+      var b2=h('button',{class:'btn',type:'button',text:'Download check-ins',disabled:true,onclick:exportCheckins});
+      load().then(function(){
+        status.textContent=plantings.length+' planting'+(plantings.length===1?'':'s')+' and '+checkins.length+' check-in'+(checkins.length===1?'':'s')+', including anything in the trash.';
+        b1.disabled=false; b2.disabled=false;
+      }).catch(function(e){status.textContent='Could not get the latest entries: '+errText(e);});
+      return h('div',null,
+        h('p',{text:'Downloads spreadsheet files (.csv) that open in Excel, Google Sheets or Numbers. Save a copy every month or so as a backup.'}),
+        status,
+        h('div',{style:'display:flex;flex-direction:column;gap:10px;margin:14px 0'},b1,b2),
+        h('p',{class:'meta',text:'Photos stay in the app. The files list how many photos each entry has.'}));
+    });
+  }
+
   function render(){
     app.replaceChildren();
     var head=h('header',null,h('div',null,h('div',{class:'eyebrow',text:'Edible Healing Garden'}),h('h1',{text:'Bed log'})));
-    if(phase==='ready') head.append(h('button',{class:'btn alt small',type:'button',text:'Refresh',onclick:function(){refresh().then(function(){toast('Up to date');});}}));
+    if(phase==='ready') head.append(h('div',{style:'display:flex;gap:6px'},
+      h('button',{class:'btn alt small',type:'button',text:'Export',onclick:openExport}),
+      h('button',{class:'btn alt small',type:'button',text:'Refresh',onclick:function(){refresh().then(function(){toast('Up to date');});}})));
     app.append(head);
     if(phase==='loading'){app.append(h('div',{class:'note',text:'Connecting…'}));return;}
     if(phase==='error'){app.append(h('div',{class:'note'},h('strong',{text:'Could not connect. '}),errMsg,' ',h('button',{class:'link',type:'button',text:'Try again',onclick:boot})));return;}
